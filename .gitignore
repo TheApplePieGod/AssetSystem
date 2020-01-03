@@ -1,0 +1,8 @@
+.vs/*
+*.vcxproj*
+*.sln
+*.obj
+*.tlog
+*.log
+*.pch
+*.pdb
