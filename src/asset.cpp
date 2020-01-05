@@ -1,6 +1,11 @@
 #include "pch/pch.h"
 #include "asset.h"
 
+#pragma warning( push )
+#pragma warning( disable : 6387)
+#pragma warning( disable : 6386)
+#pragma warning( disable : 26444)
+
 static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Save File" };
 static asset_settings AssetSettings;
 
@@ -19,15 +24,22 @@ void SetAssetSettings(asset_settings Settings)
 	AssetSettings = Settings;
 }
 
-void /*ASSETSYSTEM_API*/ cAsset::UnloadAsset()
+void cAsset::UnloadAsset()
 {
 	delete[] Data;
 	Data = nullptr;
 	Loaded = false;
 }
 
-void /*ASSETSYSTEM_API*/ cTextureAsset::LoadAssetData(bool RefreshAsset) //todo: update method of loading / unloading (remove new)
+/*
+* Unloads previous data
+* RefreshAsset: Reload texture dimensions from file
+*/
+void cTextureAsset::LoadAssetData(bool RefreshAsset) //todo: update method of loading / unloading (remove new)
 {
+	if (Loaded)
+		UnloadAsset();
+
 	FILE* pak = nullptr;
 	if (AssetSettings.LoadFromPack)
 	{
@@ -62,17 +74,26 @@ void /*ASSETSYSTEM_API*/ cTextureAsset::LoadAssetData(bool RefreshAsset) //todo:
 	fclose(pak);
 }
 
-void /*ASSETSYSTEM_API*/ cTextureAsset::UnloadAsset()
+void cTextureAsset::UnloadAsset()
 {
 	SAFE_RELEASE(TextureHandle);
-	SAFE_RELEASE(AssociatedShaderHandle);
+	SAFE_RELEASE(ShaderHandle);
 	delete[] Data;
 	Data = nullptr;
+	TextureHandle = nullptr;
+	ShaderHandle = nullptr;
 	Loaded = false;
 }
 
-void /*ASSETSYSTEM_API*/ cFontAsset::LoadAssetData(bool RefreshAsset)
+/*
+* Unloads previous data
+* RefreshAsset: todo
+*/
+void cFontAsset::LoadAssetData(bool RefreshAsset)
 {
+	if (Loaded)
+		UnloadAsset();
+
 	FILE* pak = nullptr;
 	if (AssetSettings.LoadFromPack)
 	{
@@ -95,15 +116,16 @@ void /*ASSETSYSTEM_API*/ cFontAsset::LoadAssetData(bool RefreshAsset)
 	fclose(pak);
 }
 
-void /*ASSETSYSTEM_API*/ cFontAsset::UnloadAsset()
+void cFontAsset::UnloadAsset()
 {
 	SAFE_RELEASE(AtlasShaderHandle);
 	delete[] Data;
 	Data = nullptr;
+	AtlasShaderHandle = nullptr;
 	Loaded = false;
 }
 
-char_entry /*ASSETSYSTEM_API*/ cFontAsset::FindCharEntryByAscii(u32 AsciiVal)
+char_entry cFontAsset::FindCharEntryByAscii(u32 AsciiVal)
 {
 	for (u32 i = 0; i < NumChars; i++)
 	{
@@ -112,3 +134,5 @@ char_entry /*ASSETSYSTEM_API*/ cFontAsset::FindCharEntryByAscii(u32 AsciiVal)
 	}
 	return char_entry();
 }
+
+#pragma warning( pop )

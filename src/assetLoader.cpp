@@ -6,35 +6,46 @@
 
 #include "assetLoader.h"
 
-#define FONT_PIXEL_HEIGHT 40; 
+#pragma warning( push )
+#pragma warning( disable : 6387)
+#pragma warning( disable : 6386)
+#pragma warning( disable : 26444)
 
-//template class ASSETSYSTEM_API std::vector<char_entry>;
-//template class ASSETSYSTEM_API std::vector<kern_entry>;
+// define functions not needed to be exposed in the api
+namespace assetLoader
+{
+	void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, FILE* pak, bool Rebuild, bool GeneratePac, int* ID);
+
+	// if ofs is nullptr it skips pac write (internal)
+	std::string PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
+	std::string PackFont(std::string Path, char* FileBuffer, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
+
+	bool CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2);
+
+	// internal
+	void LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*));
+	void LoadFont(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cFontAsset*));
+}
 
 /*
 * Header* has a size of 1
 * Returns new file path
 */
-std::string /*ASSETSYSTEM_API*/ assetLoader::PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
+std::string assetLoader::PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
 {
 	asset_header Header;
-	png_asset_data PNGData;
 	png_pack PNGPack;
 
-	PNGData.PixelData = stbi_load(Path.c_str(), &PNGData.Width, &PNGData.Height, &PNGData.Channels, 4); // load the png
-	PNGData.Channels = 4;  // makes every loaded texture have 4 channels
-	PNGData.DataLength = PNGData.Width * PNGData.Height * PNGData.Channels;
+	unsigned char* PixelData = stbi_load(Path.c_str(), &PNGPack.Width, &PNGPack.Height, &PNGPack.Channels, 4); // load the png
+	PNGPack.Channels = 4;  // makes every loaded texture have 4 channels
+	u32 DataLength = PNGPack.Width * PNGPack.Height * PNGPack.Channels;
 
 	Header.ID = AssetID;
 	Header.Type = asset_type::Texture;
-	Header.DataSize = PNGData.DataLength;
+	Header.DataSize = DataLength;
 	Header.ExtraSize = 0;
-	Header.NextItem = sizeof(png_pack) + PNGData.DataLength;
+	Header.NextItem = sizeof(png_pack) + DataLength;
 	strcpy(Header.Filename, Filename.c_str());
-
-	PNGPack.Width = PNGData.Width;
-	PNGPack.Height = PNGData.Height;
-	PNGPack.Channels = PNGData.Channels;
 
 	if (ofs != nullptr)
 	{
@@ -42,7 +53,7 @@ std::string /*ASSETSYSTEM_API*/ assetLoader::PackImage(std::string Path, std::st
 		{
 			ofs->write((char*)&Header, sizeof(asset_header));
 			ofs->write((char*)&PNGPack, sizeof(png_pack));
-			ofs->write((char*)PNGData.PixelData, PNGData.DataLength);
+			ofs->write((char*)PixelData, DataLength);
 		}
 	}
 
@@ -57,19 +68,31 @@ std::string /*ASSETSYSTEM_API*/ assetLoader::PackImage(std::string Path, std::st
 	{
 		fwrite((char*)&Header, sizeof(asset_header), 1, file);
 		fwrite((char*)&PNGPack, sizeof(png_pack), 1, file);
-		fwrite((char*)PNGData.PixelData, sizeof(char), PNGData.DataLength, file);
+		fwrite((char*)PixelData, sizeof(char), DataLength, file);
 		fclose(file);
 	}
 
-	delete PNGData.PixelData;
+	delete PixelData;
 	return NewPath;
+}
+
+const char* assetLoader::PackImage(const char* Path, int AssetID)
+{
+	WIN32_FIND_DATA data;
+	HANDLE hFind = FindFirstFile(Path, &data);
+
+	std::string ret = assetLoader::PackImage(Path, data.cFileName, AssetID);
+	char* retptr = new char[ret.size() + 1];
+	strcpy(retptr, ret.c_str());
+
+	return retptr;
 }
 
 /*
 * Header* has a size of 1
 * Returns new file path
 */
-std::string /*ASSETSYSTEM_API*/ assetLoader::PackFont(std::string Path, char* FileBuffer, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
+std::string assetLoader::PackFont(std::string Path, char* FileBuffer, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
 {
 	std::vector<char_entry> Characters;
 	std::vector<kern_entry> KernValues;
@@ -80,7 +103,7 @@ std::string /*ASSETSYSTEM_API*/ assetLoader::PackFont(std::string Path, char* Fi
 	stbtt_InitFont(&FontInfo, (unsigned char*)FileBuffer, stbtt_GetFontOffsetForIndex((unsigned char*)FileBuffer, 0));
 	stbtt_GetFontVMetrics(&FontInfo, &Ascent, &Descent, &LineGap);
 
-	f32 PH = FONT_PIXEL_HEIGHT;
+	f32 PH = (f32)GetAssetSettings().FontSizePixels;
 	f32 ScaleMultiplier = stbtt_ScaleForPixelHeight(&FontInfo, PH);
 	Ascent *= (s32)ScaleMultiplier;
 	Descent *= (s32)ScaleMultiplier;
@@ -92,8 +115,8 @@ std::string /*ASSETSYSTEM_API*/ assetLoader::PackFont(std::string Path, char* Fi
 	memset(AtlasBuffer, 0, AtlasDataSize);
 
 	s32 CharCounter = 1;
-	s32 BoxHeight = FONT_PIXEL_HEIGHT;
-	s32 BoxWidth = FONT_PIXEL_HEIGHT;
+	s32 BoxHeight = GetAssetSettings().FontSizePixels;
+	s32 BoxWidth = BoxHeight;
 	s32 CurrentRow = 1;
 	s32 CharsPerRow = TextureDim / BoxWidth;
 
@@ -206,12 +229,30 @@ std::string /*ASSETSYSTEM_API*/ assetLoader::PackFont(std::string Path, char* Fi
 	}
 
 	free(AtlasBuffer);
-	//Characters.ManualFree();
-	//KernValues.ManualFree();
 	return NewPath;
 }
 
-asset_type /*ASSETSYSTEM_API*/ assetLoader::GetFileType(char* Filename)
+const char* assetLoader::PackFont(const char* Path, int AssetID)
+{
+	WIN32_FIND_DATA FileData;
+	HANDLE hFind = FindFirstFile(Path, &FileData);
+
+	// load font file
+	u32 filesize = (FileData.nFileSizeHigh * ((long)MAXDWORD + 1)) + FileData.nFileSizeLow;
+	std::ifstream ifs(Path, std::ifstream::binary);
+	char* FileBuffer = new char[filesize];
+	ifs.rdbuf()->sgetn(FileBuffer, filesize);
+	ifs.close();
+
+	std::string ret = PackFont(Path, FileBuffer, FileData.cFileName, AssetID);
+	char* retptr = new char[ret.size() + 1];
+	strcpy(retptr, ret.c_str());
+
+	delete[] FileBuffer;
+	return retptr;
+}
+
+asset_type assetLoader::GetFileType(char* Filename)
 {
 	std::locale loc;
 	int Length = (int)strlen(Filename);
@@ -238,7 +279,7 @@ asset_type /*ASSETSYSTEM_API*/ assetLoader::GetFileType(char* Filename)
 		return asset_type::Invalid;
 }
 
-void /*ASSETSYSTEM_API*/ assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, FILE* pak, bool Rebuild, bool GeneratePac, int* ID)
+void assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, FILE* pak, bool Rebuild, bool GeneratePac, int* ID)
 {
 	std::string Path = std::string(DirectoryPath);
 	WIN32_FIND_DATA data;
@@ -309,7 +350,7 @@ void /*ASSETSYSTEM_API*/ assetLoader::IterateOverDirectory(const char* Directory
 	}
 }
 
-void /*ASSETSYSTEM_API*/ assetLoader::ScanAssets(bool Rebuild, bool GeneratePac)
+void assetLoader::ScanAssets(bool Rebuild, bool GeneratePac)
 {
 	std::ofstream ofs;
 	WIN32_FIND_DATA data;
@@ -355,10 +396,7 @@ void /*ASSETSYSTEM_API*/ assetLoader::ScanAssets(bool Rebuild, bool GeneratePac)
 	}
 }
 
-/*
-* Use the other LoadImage for independent use
-*/
-void /*ASSETSYSTEM_API*/ assetLoader::LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*))
+void assetLoader::LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*))
 {
 	png_pack reading;
 	size_t d = fread((char*)&reading, sizeof(reading), 1, File);
@@ -376,9 +414,9 @@ void /*ASSETSYSTEM_API*/ assetLoader::LoadImage(FILE* File, asset_header& Header
 	(*Callback)(TexAsset);
 }
 
-void assetLoader::LoadImage(std::string Path, void (*Callback)(cTextureAsset*))
+void assetLoader::LoadImage(const char* Path, void (*Callback)(cTextureAsset*))
 {
-	FILE* file = fopen(Path.c_str(), "rb");
+	FILE* file = fopen(Path, "rb");
 	if (file)
 	{
 		asset_header Header;
@@ -389,7 +427,7 @@ void assetLoader::LoadImage(std::string Path, void (*Callback)(cTextureAsset*))
 	}
 }
 
-void /*ASSETSYSTEM_API*/ assetLoader::LoadFont(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cFontAsset*))
+void assetLoader::LoadFont(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cFontAsset*))
 {
 	cFontAsset* FontAsset = new cFontAsset;
 	fread((char*)&FontAsset->FontData, sizeof(font_pack), 1, File);
@@ -409,7 +447,20 @@ void /*ASSETSYSTEM_API*/ assetLoader::LoadFont(FILE* File, asset_header& Header,
 	(*Callback)(FontAsset);
 }
 
-void /*ASSETSYSTEM_API*/ assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // assets should never change, so new is OK (later add int array of ids to load)
+void assetLoader::LoadFont(const char* Path, void (*Callback)(cFontAsset*))
+{
+	FILE* file = fopen(Path, "rb");
+	if (file)
+	{
+		asset_header Header;
+		fread((char*)&Header, 1, sizeof(asset_header), file);
+		LoadFont(file, Header, Path, Callback);
+
+		fclose(file);
+	}
+}
+
+void assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // assets should never change, so new is OK (later add int array of ids to load)
 {
 	FILE* pak = fopen(GetAssetSettings().PackFileName, "rb");
 	char Buffer[20];
@@ -441,7 +492,7 @@ void /*ASSETSYSTEM_API*/ assetLoader::InitializeAssetsFromPac(asset_load_callbac
 	}
 }
 
-bool /*ASSETSYSTEM_API*/ assetLoader::CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2)
+bool assetLoader::CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2)
 {
 	wchar_t wtext[MAX_PATH];
 	mbstowcs(wtext, f1.cFileName, MAX_PATH + 1);//Plus null
@@ -461,7 +512,7 @@ bool /*ASSETSYSTEM_API*/ assetLoader::CompareFiles(WIN32_FIND_DATA f1, WIN32_FIN
 		return true;
 }
 
-void /*ASSETSYSTEM_API*/ assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_load_callbacks* Callbacks)
+void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_load_callbacks* Callbacks)
 {
 	std::string Path = std::string(DirectoryPath);
 	WIN32_FIND_DATA data;
@@ -506,20 +557,151 @@ void /*ASSETSYSTEM_API*/ assetLoader::InitializeAssetsInDirectory(const char* Di
 
 		switch (Header.Type)
 		{
-		case Texture:
-		{
-			LoadImage(file, Header, FullPath, Callbacks->ImageCallback);
-		} break;
+			case Texture:
+			{
+				LoadImage(file, Header, FullPath, Callbacks->ImageCallback);
+			} break;
 
-		case Font:
-		{
-			LoadFont(file, Header, FullPath, Callbacks->FontCallback);
-		} break;
+			case Font:
+			{
+				LoadFont(file, Header, FullPath, Callbacks->FontCallback);
+			} break;
 
-		default:
-		{} break;
+			default:
+			{} break;
 		}
 		fclose(file);
 	}
-	//FoundFiles.ManualFree();
 }
+
+/*
+* Export asset in exe directory
+* TODO: font export
+*/
+void assetLoader::ExportAsset(cAsset* Asset)
+{
+	if (Asset->Loaded)
+	{
+		switch (Asset->Type)
+		{
+			default:
+			{} break;
+
+			case Font:
+			{
+				//todo
+				cFontAsset* Font = (cFontAsset*)Asset;
+			} break;
+
+			case Texture:
+			{
+				cTextureAsset* Tex = (cTextureAsset*)Asset;
+				stbi_write_png(Tex->Filename, Tex->Width, Tex->Height, Tex->Channels, Tex->Data, Tex->Width * Tex->Channels);
+			} break;
+		}
+	}
+}
+
+#ifdef ASSET_DIRECTX11
+void assetLoader::RegisterDXTexture(cAsset* Asset, bool GenerateMIPs, ID3D11Device* Device, ID3D11DeviceContext* DeviceContext)
+{
+	Assert(Asset->Data != nullptr && Asset->Loaded == true);
+
+	D3D11_SUBRESOURCE_DATA TextureData = {};
+	D3D11_TEXTURE2D_DESC desc;
+
+	switch (Asset->Type)
+	{
+		default:
+		{ Assert(1 == 2); } break;
+
+		case Font:
+		{
+			cFontAsset* Font = (cFontAsset*)Asset;
+			TextureData.SysMemPitch = Font->FontData.AtlasDim * 1; // assumes one channel
+			desc.Width = Font->FontData.AtlasDim;
+			desc.Height = Font->FontData.AtlasDim;
+			desc.Format = DXGI_FORMAT_A8_UNORM; // should always be 1
+		} break;
+
+		case Texture:
+		{
+			cTextureAsset* Tex = (cTextureAsset*)Asset;
+			TextureData.SysMemPitch = Tex->Channels * Tex->Width;
+			desc.Width = Tex->Width;
+			desc.Height = Tex->Height;
+			switch (Tex->Channels)
+			{
+				case 0:
+				case 2:
+				{
+					Assert(1 == 2); // cant have 0 or 2 channel texture
+				}
+				case 1:
+				{
+					desc.Format = DXGI_FORMAT_A8_UNORM;
+					break;
+				}
+				case 3:
+				case 4:
+				{
+					desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+					break;
+				}
+			}
+		} break;
+	}
+
+	desc.MiscFlags = GenerateMIPs ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+	desc.MipLevels = GenerateMIPs ? 0 : 1;
+	desc.ArraySize = 1;
+
+	desc.SampleDesc.Count = 1;
+	desc.SampleDesc.Quality = 0;
+	desc.Usage = D3D11_USAGE_DEFAULT; // Only the GPU has access to read this resource
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+	desc.CPUAccessFlags = 0; // No CPU access is required
+
+	ID3D11Texture2D* pTexture = NULL;
+	HRESULT hr = Device->CreateTexture2D(&desc, NULL, &pTexture);
+	if (FAILED(hr))
+		Assert(1 == 2);
+
+	DeviceContext->UpdateSubresource(pTexture, 0, NULL, Asset->Data, TextureData.SysMemPitch, 0);
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = desc.Format;
+	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = GenerateMIPs ? 0 : 1;
+
+	ID3D11ShaderResourceView* shader = NULL;
+	hr = Device->CreateShaderResourceView((ID3D11Resource*)pTexture, NULL, &shader);
+	if (FAILED(hr))
+		Assert(1 == 2);
+
+	if (GenerateMIPs)
+		DeviceContext->GenerateMips(shader);
+
+	switch (Asset->Type)
+	{
+		default:
+		{ Assert(1 == 2); } break;
+
+		case Font:
+		{
+			cFontAsset* Font = (cFontAsset*)Asset;
+			Font->AtlasShaderHandle = shader;
+		} break;
+
+		case Texture:
+		{
+			cTextureAsset* Tex = (cTextureAsset*)Asset;
+			Tex->ShaderHandle = shader;
+			Tex->TextureHandle = pTexture;
+		} break;
+	}
+}
+#endif
+
+#pragma warning( pop )

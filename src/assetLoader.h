@@ -5,11 +5,6 @@
 typedef void (*t_ImageCallback)(cTextureAsset*);
 typedef void (*t_FontCallback)(cFontAsset*);
 
-#ifdef ASSET_FORWARD_DECLARATIONS
-struct WIN32_FIND_DATA;
-namespace std { class string; class ofstream; }
-#endif
-
 namespace assetLoader
 {
 	struct asset_load_callbacks
@@ -18,20 +13,43 @@ namespace assetLoader
 		t_FontCallback FontCallback;
 	};
 
-	void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, FILE* pak, bool Rebuild, bool GeneratePac, int* ID);
+	/*
+	* Scan directory and convert assets to asset format
+	* GeneratePac: optionally generate the pack file
+	*/
 	void ScanAssets(bool Rebuild, bool GeneratePac);
+
+	// Initialize/load asset files
 	void InitializeAssetsInDirectory(const char* DirectoryPath, asset_load_callbacks* Callbacks);
 	void InitializeAssetsFromPac(asset_load_callbacks* Callbacks);
 
-	// if ofs is nullptr it skips pac write
-	std::string PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
-	std::string PackFont(std::string Path, char* FileBuffer, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
+	/*
+	* Dynamically convert file into asset format on drive; returns new full path of the converted file
+	* Path is full path of the file
+	* AssetID MUST be unique from other assets
+	* Does not generate/modify pack file; it must be recreated
+	* Returned path is newed, must be deleted after use
+	*/
+	const char* PackImage(const char* Path, int AssetID);
+	const char* PackFont(const char* Path, int AssetID);
 
-	void LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*));
-	void LoadImage(std::string Path, void (*Callback)(cTextureAsset*));
+	/*
+	* Individually load assets from disk
+	* Path is full path of the file
+	* only supported in debug mode
+	* (useful for dragging/dropping new assets)
+	*/
+	void LoadImage(const char* Path, void (*Callback)(cTextureAsset*));
+	void LoadFont(const char* Path, void (*Callback)(cFontAsset*));
 
-	void LoadFont(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cFontAsset*));
+	// Returns type of file (if supported) from any filename, otherwise returns invalid
 	asset_type GetFileType(char* Filename);
 
-	bool CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2);
+	// Exports loaded asset to exe directory
+	void ExportAsset(cAsset* Asset);
+
+#ifdef ASSET_DIRECTX11
+	// Call after LoadAssetData when asset has a texture
+	void RegisterDXTexture(cAsset* Asset, bool GenerateMIPs, ID3D11Device* Device, ID3D11DeviceContext* DeviceContext);
+#endif
 }
