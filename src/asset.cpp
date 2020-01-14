@@ -6,7 +6,7 @@
 #pragma warning( disable : 6386)
 #pragma warning( disable : 26444)
 
-static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Save File" };
+static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Save File", "Mesh" };
 static asset_settings AssetSettings;
 
 const char* GetStringFromAssetType(asset_type Type)
@@ -125,14 +125,14 @@ void cFontAsset::UnloadAsset()
 	Loaded = false;
 }
 
-char_entry cFontAsset::FindCharEntryByAscii(u32 AsciiVal)
+void cMeshAsset::LoadAssetData(bool RefreshAsset)
 {
-	for (u32 i = 0; i < NumChars; i++)
-	{
-		if (Characters[i].AsciiValue == AsciiVal)
-			return Characters[i];
-	}
-	return char_entry();
+
+}
+
+void cMeshAsset::UnloadAsset()
+{
+
 }
 
 #pragma warning( pop )

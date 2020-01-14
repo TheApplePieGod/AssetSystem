@@ -11,10 +11,4 @@
 #include <string>
 #include <vector>
 
-#include "../lib/stb_image.h"
-
-#include "../lib/stb_image_write.h"
-
-#include "../lib/stb_truetype.h"
-
 #define ASSET_DIRECTX11

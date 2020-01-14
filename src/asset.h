@@ -24,6 +24,7 @@ enum asset_type // convert to class
 	Texture,
 	Font,
 	SaveFile,
+	Mesh,
 };
 
 struct png_pack // change to texture_pack
@@ -159,5 +160,22 @@ struct cFontAsset : public cAsset
 	// Register atlas tex with rendering sdk by calling assetLoader::Register(your_sdk)Texture
 	void LoadAssetData(bool RefreshAsset = false) override;
 	void UnloadAsset() override;
-	char_entry FindCharEntryByAscii(u32 AsciiVal);
+
+	inline char_entry FindCharEntryByAscii(u32 AsciiVal)
+	{
+		for (u32 i = 0; i < NumChars; i++)
+		{
+			if (Characters[i].AsciiValue == AsciiVal)
+				return Characters[i];
+		}
+		return char_entry();
+	}
+};
+
+struct cMeshAsset : public cAsset
+{
+	u32 VertexCount;
+
+	void LoadAssetData(bool RefreshAsset = false) override;
+	void UnloadAsset() override;
 };

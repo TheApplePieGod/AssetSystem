@@ -4,6 +4,15 @@
 #include <shlwapi.h>
 #include <locale>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "lib/stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "lib/stb_image_write.h"
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "lib/stb_truetype.h"
+
 #include "assetLoader.h"
 
 #pragma warning( push )
@@ -37,6 +46,13 @@ std::string assetLoader::PackImage(std::string Path, std::string Filename, int A
 	png_pack PNGPack;
 
 	unsigned char* PixelData = stbi_load(Path.c_str(), &PNGPack.Width, &PNGPack.Height, &PNGPack.Channels, 4); // load the png
+
+	// stb couldn't load image (probably corrupt)
+	if (PixelData == nullptr)
+	{
+		return "NULL";
+	}
+
 	PNGPack.Channels = 4;  // makes every loaded texture have 4 channels
 	u32 DataLength = PNGPack.Width * PNGPack.Height * PNGPack.Channels;
 
@@ -275,8 +291,22 @@ asset_type assetLoader::GetFileType(char* Filename)
 		return asset_type::AssetFile;
 	else if (Checking == set.SaveFileExtension)
 		return asset_type::SaveFile;
+	else if (Checking == "fbx")
+		return asset_type::Mesh;
 	else
 		return asset_type::Invalid;
+}
+
+// windows
+char* LoadAllFileData(WIN32_FIND_DATA Data, const char* Path)
+{
+	u32 filesize = (Data.nFileSizeHigh * ((long)MAXDWORD + 1)) + Data.nFileSizeLow;
+	std::ifstream ifs(Path, std::ifstream::binary);
+	char* FileBuffer = new char[filesize];
+	ifs.rdbuf()->sgetn(FileBuffer, filesize);
+	ifs.close();
+
+	return FileBuffer;
 }
 
 void assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, FILE* pak, bool Rebuild, bool GeneratePac, int* ID)
@@ -311,50 +341,56 @@ void assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream*
 		std::string Filename = FoundFiles[i].cFileName;
 		switch (GetFileType(FoundFiles[i].cFileName))
 		{
-		case AssetFile:
-		{
-			if (GeneratePac)
+			case AssetFile:
 			{
-				u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
-				std::ifstream ifs(Path + FoundFiles[i].cFileName, std::ifstream::binary);
-				char* FileBuffer = new char[filesize];
-				ifs.rdbuf()->sgetn(FileBuffer, filesize);
-				ofs->write(FileBuffer, filesize);
+				if (GeneratePac)
+				{
+					u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
+					std::ifstream ifs(Path + FoundFiles[i].cFileName, std::ifstream::binary);
+					char* FileBuffer = new char[filesize];
+					ifs.rdbuf()->sgetn(FileBuffer, filesize);
+					ofs->write(FileBuffer, filesize);
+					delete[] FileBuffer;
+				}
+			} break;
+
+			case Texture:
+			{
+				(*ID)++;
+				PackImage((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
+			} break;
+
+			case Font:
+			{
+				// load file
+				char* FileBuffer = LoadAllFileData(FoundFiles[i], (Path + FoundFiles[i].cFileName).c_str());
+
+				(*ID)++;
+				PackFont((Path + data.cFileName), FileBuffer, Filename, *ID, ofs, GeneratePac);
 				delete[] FileBuffer;
-			}
-		} break;
+			} break;
 
-		case Texture:
-		{
-			(*ID)++;
-			PackImage((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
-		} break;
+			case Mesh:
+			{
+				// load file
+				char* FileBuffer = LoadAllFileData(FoundFiles[i], (Path + FoundFiles[i].cFileName).c_str());
 
-		case Font:
-		{
-			// load font file
-			u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
-			std::ifstream ifs(Path + FoundFiles[i].cFileName, std::ifstream::binary);
-			char* FileBuffer = new char[filesize];
-			ifs.rdbuf()->sgetn(FileBuffer, filesize);
-			ifs.close();
+				//todo
+			} break;
 
-			(*ID)++;
-			PackFont((Path + data.cFileName), FileBuffer, Filename, *ID, ofs, GeneratePac);
-			delete[] FileBuffer;
-		} break;
-
-		default:
-		{ continue; } break;
+			default:
+			{ continue; } break;
 		}
 	}
 }
 
-void assetLoader::ScanAssets(bool Rebuild, bool GeneratePac)
+void assetLoader::ScanAssets(const char* DirectoryPath, bool GeneratePac)
 {
+	bool Rebuild = true;
+	std::string Path = std::string(DirectoryPath);
 	std::ofstream ofs;
 	WIN32_FIND_DATA data;
-	HANDLE hFind = FindFirstFile("assets\\*", &data); // asset directory
+	HANDLE hFind = FindFirstFile((Path + "*").c_str(), &data); // asset directory
 	int ID = 0;
 
 	if (hFind != INVALID_HANDLE_VALUE)
@@ -567,6 +603,11 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 				LoadFont(file, Header, FullPath, Callbacks->FontCallback);
 			} break;
 
+			case Mesh:
+			{
+				// todo
+			} break;
+
 			default:
 			{} break;
 		}
@@ -597,6 +638,11 @@ void assetLoader::ExportAsset(cAsset* Asset)
 			{
 				cTextureAsset* Tex = (cTextureAsset*)Asset;
 				stbi_write_png(Tex->Filename, Tex->Width, Tex->Height, Tex->Channels, Tex->Data, Tex->Width * Tex->Channels);
+			} break;
+
+			case Mesh:
+			{
+				// todo
 			} break;
 		}
 	}
