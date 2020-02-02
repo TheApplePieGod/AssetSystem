@@ -69,10 +69,15 @@ struct font_pack // assumes one channel texture
 	u32 NumChars;
 };
 
+struct mesh_pack
+{
+	u32 NumVertices;
+};
+
 struct asset_header
 {
 	s32 ID;
-	s32 Type; // 0 = texture, 1 = fbx, 2 = font(ttf)
+	s32 Type;
 	u32 NextItem; // tells where the next asset starts
 	u32 ExtraSize; // extra value for extra data sizes
 	u32 DataSize; // tells the size of raw asset data
@@ -106,6 +111,22 @@ struct asset_settings
 
 	// size in pixels of each character in the generated font atlas 
 	int FontSizePixels = 40;
+};
+
+// Structure used when storing vertices from imported mesh
+struct mesh_vertex
+{
+	// Position in x/y plane
+	f32 x, y, z;
+
+	// UV coordinates
+	f32 u, v;
+
+	// Normals
+	f32 nx, ny, nz;
+
+	// Tangents
+	f32 tx, ty, tz;
 };
 
 const char* GetStringFromAssetType(asset_type Type);

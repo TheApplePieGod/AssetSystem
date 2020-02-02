@@ -28,12 +28,14 @@ namespace assetLoader
 	// if ofs is nullptr it skips pac write (internal)
 	std::string PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
 	std::string PackFont(std::string Path, char* FileBuffer, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
+	std::string PackMesh(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs = nullptr, bool GeneratePac = false);
 
 	bool CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2);
 
 	// internal
 	void LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*));
 	void LoadFont(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cFontAsset*));
+	void LoadMesh(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cMeshAsset*));
 }
 
 /*
@@ -268,6 +270,292 @@ const char* assetLoader::PackFont(const char* Path, int AssetID)
 	return retptr;
 }
 
+std::string assetLoader::PackMesh(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
+{
+	// Initialize the SDK manager. This object handles memory management.
+	FbxManager* lSdkManager = FbxManager::Create();
+
+	// Create the IO settings object.
+	FbxIOSettings* ios = FbxIOSettings::Create(lSdkManager, IOSROOT);
+	lSdkManager->SetIOSettings(ios);
+
+	// Create an importer using the SDK manager.
+	FbxImporter* lImporter = FbxImporter::Create(lSdkManager, "");
+
+	// Use the first argument as the filename for the importer.
+	if (!lImporter->Initialize(Path.c_str(), -1, lSdkManager->GetIOSettings())) {
+		printf("Call to FbxImporter::Initialize() failed.\n");
+		printf("Error returned: %s\n\n", lImporter->GetStatus().GetErrorString());
+		return "NULL";
+	}
+
+	// Create a new scene so that it can be populated by the imported file.
+	FbxScene* lScene = FbxScene::Create(lSdkManager, "myScene");
+
+	// Import the contents of the file into the scene.
+	if (!lImporter->Import(lScene))
+		return "NULL";
+
+	FbxGeometryConverter FbxConverter(lSdkManager);
+	FbxAxisSystem AxisSystem = lScene->GetGlobalSettings().GetAxisSystem();
+#ifdef ASSET_DIRECTX11
+	FbxAxisSystem::DirectX.ConvertScene(lScene);
+#endif
+	FbxConverter.Triangulate(lScene, true);
+
+	// The file is imported, so get rid of the importer.
+	lImporter->Destroy();
+
+	FbxNode* pFbxRootNode = lScene->GetRootNode();
+	if (pFbxRootNode)
+	{
+		std::vector<mesh_vertex> VertexArray;
+		u32 ArrayIndex = 0;
+		for (int i = 0; i < pFbxRootNode->GetChildCount(); i++)
+		{
+			FbxNode* pFbxChildNode = pFbxRootNode->GetChild(i);
+
+			if (pFbxChildNode->GetNodeAttribute() == NULL)
+				continue;
+
+			FbxNodeAttribute::EType AttributeType = pFbxChildNode->GetNodeAttribute()->GetAttributeType();
+
+			if (AttributeType != FbxNodeAttribute::eMesh) // only compatible with mesh types
+				continue;
+
+			FbxMesh* pMesh = (FbxMesh*)pFbxChildNode->GetNodeAttribute();
+
+			FbxVector4* lControlPoints = pMesh->GetControlPoints();
+
+			u32 countd = pMesh->GetPolygonCount();
+			for (s32 j = 0; j < pMesh->GetPolygonCount(); j++)
+			{
+				u32 NumVertices = pMesh->GetPolygonSize(j);
+				if (NumVertices != 3) // must be triangulated
+					return "NULL";
+
+				for (u32 k = 0; k < NumVertices; k++)
+				//for (s32 k = NumVertices - 1; k >= 0; k--)
+				{
+					mesh_vertex vert = mesh_vertex();
+					VertexArray.push_back(vert);
+
+					//vertices data
+					u32 ControlPointIndex = pMesh->GetPolygonVertex(j, k);
+					FbxVector4 Vertex = lControlPoints[ControlPointIndex];
+
+					VertexArray[ArrayIndex].x = (float)Vertex[0];
+					VertexArray[ArrayIndex].y = (float)Vertex[1];
+					VertexArray[ArrayIndex].z = (float)Vertex[2];
+
+					//UV data
+					u32 ElementUVCount = pMesh->GetElementUVCount();
+					for (u32 l = 0; l < ElementUVCount; ++l)
+					{
+						FbxGeometryElementUV* leUV = pMesh->GetElementUV(l);
+						FbxVector2 UV;
+						switch (leUV->GetMappingMode())
+						{
+							default:
+							{ }	break;
+
+							case FbxGeometryElement::eByControlPoint:
+							{
+								switch (leUV->GetReferenceMode())
+								{
+									case FbxGeometryElement::eDirect:
+									{
+										UV = leUV->GetDirectArray().GetAt(ControlPointIndex);
+									} break;
+
+									case FbxGeometryElement::eIndexToDirect:
+									{
+										int id = leUV->GetIndexArray().GetAt(ControlPointIndex);
+										UV = leUV->GetDirectArray().GetAt(id);
+									} break;
+
+									default:
+									{ }	break; // other reference modes not shown here!
+								}
+							} break;
+
+							case FbxGeometryElement::eByPolygonVertex:
+							{
+								int lTextureUVIndex = pMesh->GetTextureUVIndex(j, k);
+								switch (leUV->GetReferenceMode())
+								{
+									case FbxGeometryElement::eDirect:
+									case FbxGeometryElement::eIndexToDirect:
+									{
+										UV = leUV->GetDirectArray().GetAt(lTextureUVIndex);
+									} break;
+
+									default:
+									{ }	break; // other reference modes not shown here!
+								}
+							} break;
+
+							case FbxGeometryElement::eByPolygon: // doesn't make much sense for UVs
+							case FbxGeometryElement::eAllSame:   // doesn't make much sense for UVs
+							case FbxGeometryElement::eNone:       // doesn't make much sense for UVs
+							{ }	break;
+						}
+
+						VertexArray[ArrayIndex].u = (float)UV[0];
+						VertexArray[ArrayIndex].v = (float)UV[1]; // Invert V due to difference in coord systems between Maya and D3D
+					}
+
+					// normal data
+					u32 ElementNormalCount = pMesh->GetElementNormalCount();
+					if (ElementNormalCount == 0)
+						pMesh->GenerateNormals();
+					for (u32 l = 0; l < ElementNormalCount; l++)
+					{
+						FbxVector4 Normal;
+						FbxGeometryElementNormal* lNormalElement = pMesh->GetElementNormal(l);
+						if (lNormalElement)
+						{
+							//mapping mode is by control points. The mesh should be smooth and soft.
+							//we can get normals by retrieving each control point
+							if (lNormalElement->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+							{
+								if (lNormalElement->GetReferenceMode() == FbxGeometryElement::eDirect)
+								{
+									Normal = lNormalElement->GetDirectArray().GetAt(ControlPointIndex);
+								}
+
+								//reference mode is index-to-direct, get normals by the index-to-direct
+								if (lNormalElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+								{
+									int id = lNormalElement->GetIndexArray().GetAt(ControlPointIndex);
+									Normal = lNormalElement->GetDirectArray().GetAt(id);
+								}
+							}
+							else if (lNormalElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+							{
+								switch (lNormalElement->GetReferenceMode())
+								{
+									case FbxGeometryElement::eDirect:
+									{
+										Normal = lNormalElement->GetDirectArray().GetAt(ControlPointIndex); //?
+									} break;
+
+									case FbxGeometryElement::eIndexToDirect:
+									{
+										Normal = lNormalElement->GetDirectArray().GetAt(lNormalElement->GetIndexArray().GetAt(ControlPointIndex));
+									} break;
+
+									default:
+									{ }	break;
+								}
+							}
+						}
+
+						// storing normals as float3s
+						VertexArray[ArrayIndex].nx = (float)Normal[0];
+						VertexArray[ArrayIndex].ny = (float)Normal[1];
+						VertexArray[ArrayIndex].nz = (float)Normal[2];
+					}
+
+					// tangent data
+					u32 ElementTangentCount = pMesh->GetElementTangentCount();
+					if (ElementTangentCount == 0)
+						pMesh->GenerateTangentsDataForAllUVSets();
+					for (u32 l = 0; l < ElementTangentCount; l++)
+					{
+						FbxVector4 Tangent;
+						FbxGeometryElementTangent* lTangentElement = pMesh->GetElementTangent(l);
+						if (lTangentElement)
+						{
+							//mapping mode is by control points. The mesh should be smooth and soft.
+							//we can get normals by retrieving each control point
+							if (lTangentElement->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+							{
+								if (lTangentElement->GetReferenceMode() == FbxGeometryElement::eDirect)
+								{
+									Tangent = lTangentElement->GetDirectArray().GetAt(ControlPointIndex);
+								}
+
+								//reference mode is index-to-direct, get normals by the index-to-direct
+								if (lTangentElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+								{
+									int id = lTangentElement->GetIndexArray().GetAt(ControlPointIndex);
+									Tangent = lTangentElement->GetDirectArray().GetAt(id);
+								}
+							}
+							else if (lTangentElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+							{
+								switch (lTangentElement->GetReferenceMode())
+								{
+								case FbxGeometryElement::eDirect:
+								{
+									Tangent = lTangentElement->GetDirectArray().GetAt(ControlPointIndex); //?
+								} break;
+
+								case FbxGeometryElement::eIndexToDirect:
+								{
+									Tangent = lTangentElement->GetDirectArray().GetAt(lTangentElement->GetIndexArray().GetAt(ControlPointIndex));
+								} break;
+
+								default:
+								{ }	break;
+								}
+							}
+						}
+
+						// storing tangent as float3s
+						VertexArray[ArrayIndex].tx = (float)Tangent[0];
+						VertexArray[ArrayIndex].ty = (float)Tangent[1];
+						VertexArray[ArrayIndex].tz = (float)Tangent[2];
+					}
+
+					ArrayIndex++;
+				}
+			}
+		}
+
+		mesh_pack MeshPack;
+		MeshPack.NumVertices = (u32)VertexArray.size();
+
+		asset_header Header;
+		Header.ID = AssetID;
+		Header.Type = asset_type::Mesh;
+		Header.DataSize = MeshPack.NumVertices * sizeof(mesh_vertex);
+		Header.ExtraSize = 0;
+		Header.NextItem = sizeof(mesh_pack) + Header.DataSize;
+		strcpy(Header.Filename, Filename.c_str());
+
+		if (ofs != nullptr)
+		{
+			if (GeneratePac)
+			{
+				ofs->write((char*)&Header, sizeof(asset_header));
+				ofs->write((char*)&MeshPack, sizeof(mesh_pack));
+				ofs->write((char*)VertexArray.data(), Header.DataSize);
+			}
+		}
+
+		remove(Path.c_str());
+		std::string NewPath = Path;
+		NewPath.erase(NewPath.length() - 4, 4);
+		NewPath.push_back('.');
+		NewPath += GetAssetSettings().AssetFileExtension;
+		FILE* file;
+		file = fopen(NewPath.c_str(), "wb");
+		if (file)
+		{
+			fwrite((char*)&Header, sizeof(asset_header), 1, file);
+			fwrite((char*)&MeshPack, sizeof(mesh_pack), 1, file);
+			fwrite((char*)VertexArray.data(), sizeof(char), Header.DataSize, file);
+			fclose(file);
+		}
+
+		return NewPath;
+	}
+	else
+		return "NULL";
+}
+
 asset_type assetLoader::GetFileType(char* Filename)
 {
 	std::locale loc;
@@ -283,7 +571,7 @@ asset_type assetLoader::GetFileType(char* Filename)
 
 	asset_settings set = GetAssetSettings();
 
-	if (Checking == "png" || Checking == "jpg")
+	if (Checking == "png" || Checking == "jpg" || Checking == "tga")
 		return asset_type::Texture;
 	else if (Checking == "ttf")
 		return asset_type::Font;
@@ -372,10 +660,8 @@ void assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream*
 
 			case Mesh:
 			{
-				// load file
-				char* FileBuffer = LoadAllFileData(FoundFiles[i], (Path + FoundFiles[i].cFileName).c_str());
-
-				//todo
+				(*ID)++;
+				PackMesh((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
 			} break;
 
 			default:
@@ -496,6 +782,35 @@ void assetLoader::LoadFont(const char* Path, void (*Callback)(cFontAsset*))
 	}
 }
 
+void assetLoader::LoadMesh(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cMeshAsset*))
+{
+	mesh_pack reading;
+	size_t d = fread((char*)&reading, sizeof(reading), 1, File);
+	cMeshAsset* MeshAsset = new cMeshAsset;
+	MeshAsset->AssetID = Header.ID;
+	MeshAsset->Type = asset_type::Mesh;
+	MeshAsset->DataSize = Header.DataSize;
+	MeshAsset->VertexCount = reading.NumVertices;
+	strncpy(MeshAsset->Filename, Header.Filename, MAX_PATH);
+	strncpy(MeshAsset->Path, Path.c_str(), MAX_PATH);
+	MeshAsset->LoadAssetData();
+
+	(*Callback)(MeshAsset);
+}
+
+void assetLoader::LoadMesh(const char* Path, void (*Callback)(cMeshAsset*))
+{
+	FILE* file = fopen(Path, "rb");
+	if (file)
+	{
+		asset_header Header;
+		fread((char*)&Header, 1, sizeof(asset_header), file);
+		LoadMesh(file, Header, Path, Callback);
+
+		fclose(file);
+	}
+}
+
 void assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // assets should never change, so new is OK (later add int array of ids to load)
 {
 	FILE* pak = fopen(GetAssetSettings().PackFileName, "rb");
@@ -512,16 +827,25 @@ void assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // as
 		}
 		else
 		{
-			PrevIndex = SearchingHeader.ID; // TODO: stop using new
+			PrevIndex = SearchingHeader.ID;
 			int Position = ftell(pak) - sizeof(SearchingHeader);
 			_snprintf_s(Buffer, sizeof(Buffer), "%d", Position);
 			std::string Path = Buffer;
 
-			if (SearchingHeader.Type == asset_type::Texture) // texture asset found
-				LoadImage(pak, SearchingHeader, Path, Callbacks->ImageCallback);
+			switch (SearchingHeader.Type)
+			{
+				case Texture:
+				{ LoadImage(pak, SearchingHeader, Path, Callbacks->ImageCallback); } break;
 
-			else if (SearchingHeader.Type == asset_type::Font) // font asset found
-				LoadFont(pak, SearchingHeader, Path, Callbacks->FontCallback);
+				case Font:
+				{ LoadFont(pak, SearchingHeader, Path, Callbacks->FontCallback); } break;
+
+				case Mesh:
+				{ LoadMesh(pak, SearchingHeader, Path, Callbacks->MeshCallback); } break;
+
+				default:
+				{} break;
+			}
 
 			fseek(pak, SearchingHeader.DataSize, SEEK_CUR); // set pos to next asset
 		}
@@ -594,19 +918,13 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 		switch (Header.Type)
 		{
 			case Texture:
-			{
-				LoadImage(file, Header, FullPath, Callbacks->ImageCallback);
-			} break;
+			{ LoadImage(file, Header, FullPath, Callbacks->ImageCallback); } break;
 
 			case Font:
-			{
-				LoadFont(file, Header, FullPath, Callbacks->FontCallback);
-			} break;
+			{ LoadFont(file, Header, FullPath, Callbacks->FontCallback); } break;
 
 			case Mesh:
-			{
-				// todo
-			} break;
+			{ LoadMesh(file, Header, FullPath, Callbacks->MeshCallback); } break;
 
 			default:
 			{} break;
@@ -617,7 +935,7 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 
 /*
 * Export asset in exe directory
-* TODO: font export
+* TODO: font export (save original file in asset file?)
 */
 void assetLoader::ExportAsset(cAsset* Asset)
 {
@@ -630,7 +948,7 @@ void assetLoader::ExportAsset(cAsset* Asset)
 
 			case Font:
 			{
-				//todo
+				//todo (not supported?)
 				cFontAsset* Font = (cFontAsset*)Asset;
 			} break;
 
@@ -643,6 +961,7 @@ void assetLoader::ExportAsset(cAsset* Asset)
 			case Mesh:
 			{
 				// todo
+				cMeshAsset* Mesh = (cMeshAsset*)Asset;
 			} break;
 		}
 	}

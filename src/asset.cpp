@@ -127,12 +127,36 @@ void cFontAsset::UnloadAsset()
 
 void cMeshAsset::LoadAssetData(bool RefreshAsset)
 {
+	if (Loaded)
+		UnloadAsset();
 
+	FILE* pak = nullptr;
+	if (AssetSettings.LoadFromPack)
+	{
+		pak = fopen(AssetSettings.PackFileName, "rb");
+		fseek(pak, atoi(Path), SEEK_SET);
+	}
+	else
+		pak = fopen(Path, "rb");
+
+	asset_header SearchingHeader;
+	fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
+
+	mesh_vertex* Vertices = new mesh_vertex[SearchingHeader.DataSize / sizeof(mesh_vertex)];
+	fseek(pak, sizeof(mesh_pack), SEEK_CUR);
+	fread(Vertices, SearchingHeader.DataSize, 1, pak);
+
+	Loaded = true;
+	Data = Vertices;
+
+	fclose(pak);
 }
 
 void cMeshAsset::UnloadAsset()
 {
-
+	delete[] Data;
+	Data = nullptr;
+	Loaded = false;
 }
 
 #pragma warning( pop )

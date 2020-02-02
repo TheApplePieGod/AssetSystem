@@ -1,9 +1,12 @@
 #pragma once
 
+//TODO: update asset when filename changes
+
 #include "asset.h"
 
 typedef void (*t_ImageCallback)(cTextureAsset*);
 typedef void (*t_FontCallback)(cFontAsset*);
+typedef void (*t_MeshCallback)(cMeshAsset*);
 
 namespace assetLoader
 {
@@ -11,6 +14,7 @@ namespace assetLoader
 	{
 		t_ImageCallback ImageCallback;
 		t_FontCallback FontCallback;
+		t_MeshCallback MeshCallback;
 	};
 
 	/*
@@ -42,6 +46,7 @@ namespace assetLoader
 	*/
 	void LoadImage(const char* Path, void (*Callback)(cTextureAsset*));
 	void LoadFont(const char* Path, void (*Callback)(cFontAsset*));
+	void LoadMesh(const char* Path, void (*Callback)(cMeshAsset*));
 
 	// Returns type of file (if supported) from any filename, otherwise returns invalid
 	asset_type GetFileType(char* Filename);
@@ -50,7 +55,7 @@ namespace assetLoader
 	void ExportAsset(cAsset* Asset);
 
 #ifdef ASSET_DIRECTX11
-	// Call after LoadAssetData when asset has a texture
+	// Call after LoadAssetData if asset has a texture (font, texture)
 	void RegisterDXTexture(cAsset* Asset, bool GenerateMIPs, ID3D11Device* Device, ID3D11DeviceContext* DeviceContext);
 #endif
 }

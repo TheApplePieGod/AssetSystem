@@ -10,5 +10,6 @@
 #include <d3d11.h>
 #include <string>
 #include <vector>
+#include <fbxsdk.h>
 
 #define ASSET_DIRECTX11

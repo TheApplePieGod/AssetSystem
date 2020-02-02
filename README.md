@@ -1,8 +1,6 @@
 # AssetSystem
 
-Open source C++ library for game engines/applications to manage file based assets
-
-*Currently hardcoded for Windows*
+Open source, windows based, C++ library for game engines/applications to manage file based assets
 
 Right now the only supported sdk is DirectX11, so make sure you
 ```
