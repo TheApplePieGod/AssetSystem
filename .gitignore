@@ -6,5 +6,6 @@
 *.log
 *.pch
 *.pdb
+*.lib
 
 src/lib/FBX
