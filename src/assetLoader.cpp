@@ -40,8 +40,6 @@ asset_type assetLoader::GetFileType(char* Filename)
 		return asset_type::Font;
 	else if (Checking == set.AssetFileExtension)
 		return asset_type::AssetFile;
-	else if (Checking == set.SaveFileExtension)
-		return asset_type::SaveFile;
 	else if (Checking == "fbx")
 		return asset_type::Mesh;
 	else

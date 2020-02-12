@@ -23,7 +23,6 @@ enum asset_type // convert to class
 	AssetFile,
 	Texture,
 	Font,
-	SaveFile,
 	Mesh,
 };
 
@@ -105,9 +104,6 @@ struct asset_settings
 
 	// MUST only be 3 chars
 	char AssetFileExtension[4] = "eaf";
-
-	// MUST only be 3 chars
-	char SaveFileExtension[4] = "sav";
 
 	// size in pixels of each character in the generated font atlas 
 	int FontSizePixels = 40;

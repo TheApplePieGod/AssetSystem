@@ -6,7 +6,7 @@
 #pragma warning( disable : 6386)
 #pragma warning( disable : 26444)
 
-static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Save File", "Mesh" };
+static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Mesh" };
 static asset_settings AssetSettings;
 
 const char* GetStringFromAssetType(asset_type Type)
