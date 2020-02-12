@@ -11,5 +11,9 @@
 #include <string>
 #include <vector>
 #include <fbxsdk.h>
+#include <fstream>
+#include <algorithm>
+#include <shlwapi.h>
+#include <locale>
 
 #define ASSET_DIRECTX11

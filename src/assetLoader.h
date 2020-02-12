@@ -37,6 +37,7 @@ namespace assetLoader
 	*/
 	const char* PackImage(const char* Path, int AssetID);
 	const char* PackFont(const char* Path, int AssetID);
+	const char* PackMesh(const char* Path, int AssetID);
 
 	/*
 	* Individually load assets from disk
@@ -53,6 +54,9 @@ namespace assetLoader
 
 	// Exports loaded asset to exe directory
 	void ExportAsset(cAsset* Asset);
+
+	// Returns 3 character lowercase file extension from filename
+	const char* GetLowercaseFileExtension(char* Filename);
 
 #ifdef ASSET_DIRECTX11
 	// Call after LoadAssetData if asset has a texture (font, texture)
