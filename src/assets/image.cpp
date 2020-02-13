@@ -10,101 +10,138 @@
 #include "../lib/stb_image_write.h"
 #include "../lib/stb_truetype.h"
 
-/*
-* Returns new file path
-*/
-std::string assetLoader::PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
+u32 assetLoader::Image_GetDataForWriting(char*& Out_Data, u32& Out_RawDataSize, char* FilePath)
 {
-	asset_header Header;
 	png_pack PNGPack;
-
-	unsigned char* PixelData = stbi_load(Path.c_str(), &PNGPack.Width, &PNGPack.Height, &PNGPack.Channels, 4); // load the png
-
+	unsigned char* PixelData = stbi_load(FilePath, &PNGPack.Width, &PNGPack.Height, &PNGPack.Channels, 4); // load the png
+	
 	// stb couldn't load image (probably corrupt)
 	if (PixelData == nullptr)
-	{
-		return "NULL";
-	}
-
+		return 0;
+	
 	PNGPack.Channels = 4;  // makes every loaded texture have 4 channels
 	u32 DataLength = PNGPack.Width * PNGPack.Height * PNGPack.Channels;
+	u32 TotalSize = sizeof(PNGPack) + DataLength;
 
-	Header.ID = AssetID;
-	Header.Type = asset_type::Texture;
-	Header.DataSize = DataLength;
-	Header.ExtraSize = 0;
-	Header.NextItem = sizeof(png_pack) + DataLength;
-	strcpy(Header.Filename, Filename.c_str());
+	Out_Data = new char[TotalSize];
+	memcpy(Out_Data, (char*)&PNGPack, sizeof(PNGPack));
+	memcpy(Out_Data + sizeof(PNGPack), (char*)PixelData, DataLength);
 
-	if (ofs != nullptr)
-	{
-		if (GeneratePac)
-		{
-			ofs->write((char*)&Header, sizeof(asset_header));
-			ofs->write((char*)&PNGPack, sizeof(png_pack));
-			ofs->write((char*)PixelData, DataLength);
-		}
-	}
-
-	remove(Path.c_str());
-	std::string NewPath = Path;
-	NewPath.erase(NewPath.length() - 4, 4);
-	NewPath.push_back('.');
-	NewPath += GetAssetSettings().AssetFileExtension;
-	FILE* file;
-	file = fopen(NewPath.c_str(), "wb");
-	if (file)
-	{
-		fwrite((char*)&Header, sizeof(asset_header), 1, file);
-		fwrite((char*)&PNGPack, sizeof(png_pack), 1, file);
-		fwrite((char*)PixelData, sizeof(char), DataLength, file);
-		fclose(file);
-	}
-
-	delete PixelData;
-	return NewPath;
+	Out_RawDataSize = DataLength;
+	delete[] PixelData;
+	return TotalSize;
 }
 
-const char* assetLoader::PackImage(const char* Path, int AssetID)
+void assetLoader::Image_InitializeData(cAsset* AssetDefaults, char* Data, u32 DataSize)
 {
-	WIN32_FIND_DATA data;
-	HANDLE hFind = FindFirstFile(Path, &data);
+	png_pack PNGPack = *((png_pack*)Data);
+	cTextureAsset* TexAsset = new cTextureAsset();
+	TexAsset->CopyFields(AssetDefaults);
 
-	std::string ret = assetLoader::PackImage(Path, data.cFileName, AssetID);
-	char* retptr = new char[ret.size() + 1];
-	strcpy(retptr, ret.c_str());
+	TexAsset->Width = PNGPack.Width;
+	TexAsset->Height = PNGPack.Height;
+	TexAsset->Channels = PNGPack.Channels;
 
-	return retptr;
-}
-
-
-void assetLoader::LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*))
-{
-	png_pack reading;
-	size_t d = fread((char*)&reading, sizeof(reading), 1, File);
-	cTextureAsset* TexAsset = new cTextureAsset;
-	TexAsset->AssetID = Header.ID;
-	TexAsset->Type = asset_type::Texture; // texture
-	TexAsset->DataSize = Header.DataSize;
-	TexAsset->Width = reading.Width;
-	TexAsset->Height = reading.Height;
-	TexAsset->Channels = reading.Channels;
-	strncpy(TexAsset->Filename, Header.Filename, MAX_PATH);
-	strncpy(TexAsset->Path, Path.c_str(), MAX_PATH);
+	// todo: read directly from Data instead of calling load ?
 	TexAsset->LoadAssetData();
 
-	(*Callback)(TexAsset);
+	//(*Callback)(TexAsset);
 }
 
-void assetLoader::LoadImage(const char* Path, void (*Callback)(cTextureAsset*))
-{
-	FILE* file = fopen(Path, "rb");
-	if (file)
-	{
-		asset_header Header;
-		fread((char*)&Header, 1, sizeof(asset_header), file);
-		LoadImage(file, Header, Path, Callback);
-
-		fclose(file);
-	}
-}
+///*
+//* Returns new file path
+//*/
+//std::string assetLoader::PackImage(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
+//{
+//	asset_header Header;
+//	png_pack PNGPack;
+//
+//	unsigned char* PixelData = stbi_load(Path.c_str(), &PNGPack.Width, &PNGPack.Height, &PNGPack.Channels, 4); // load the png
+//
+//	// stb couldn't load image (probably corrupt)
+//	if (PixelData == nullptr)
+//	{
+//		return "NULL";
+//	}
+//
+//	PNGPack.Channels = 4;  // makes every loaded texture have 4 channels
+//	u32 DataLength = PNGPack.Width * PNGPack.Height * PNGPack.Channels;
+//
+//	Header.ID = AssetID;
+//	Header.Type = asset_type::Texture;
+//	Header.DataSize = DataLength;
+//	Header.ExtraSize = 0;
+//	Header.NextItem = sizeof(png_pack) + DataLength;
+//	strcpy(Header.Filename, Filename.c_str());
+//
+//	if (ofs != nullptr)
+//	{
+//		if (GeneratePac)
+//		{
+//			ofs->write((char*)&Header, sizeof(asset_header));
+//			ofs->write((char*)&PNGPack, sizeof(png_pack));
+//			ofs->write((char*)PixelData, DataLength);
+//		}
+//	}
+//
+//	remove(Path.c_str());
+//	std::string NewPath = Path;
+//	NewPath.erase(NewPath.length() - 4, 4);
+//	NewPath.push_back('.');
+//	NewPath += GetAssetSettings().AssetFileExtension;
+//	FILE* file;
+//	file = fopen(NewPath.c_str(), "wb");
+//	if (file)
+//	{
+//		fwrite((char*)&Header, sizeof(asset_header), 1, file);
+//		fwrite((char*)&PNGPack, sizeof(png_pack), 1, file);
+//		fwrite((char*)PixelData, sizeof(char), DataLength, file);
+//		fclose(file);
+//	}
+//
+//	delete PixelData;
+//	return NewPath;
+//}
+//
+//const char* assetLoader::PackImage(const char* Path, int AssetID)
+//{
+//	WIN32_FIND_DATA data;
+//	HANDLE hFind = FindFirstFile(Path, &data);
+//
+//	std::string ret = assetLoader::PackImage(Path, data.cFileName, AssetID);
+//	char* retptr = new char[ret.size() + 1];
+//	strcpy(retptr, ret.c_str());
+//
+//	return retptr;
+//}
+// 
+//void assetLoader::LoadImage(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cTextureAsset*))
+//{
+//	png_pack reading;
+//	size_t d = fread((char*)&reading, sizeof(reading), 1, File);
+//	cTextureAsset* TexAsset = new cTextureAsset;
+//	TexAsset->AssetID = Header.ID;
+//	TexAsset->Type = asset_type::Texture; // texture
+//	TexAsset->DataSize = Header.DataSize;
+//	TexAsset->Width = reading.Width;
+//	TexAsset->Height = reading.Height;
+//	TexAsset->Channels = reading.Channels;
+//	strncpy(TexAsset->Filename, Header.Filename, MAX_PATH);
+//	strncpy(TexAsset->Path, Path.c_str(), MAX_PATH);
+//	TexAsset->LoadAssetData();
+//
+//	(*Callback)(TexAsset);
+//}
+//
+//void assetLoader::LoadImage(const char* Path, void (*Callback)(cTextureAsset*))
+//{
+//	FILE* file = fopen(Path, "rb");
+//	if (file)
+//	{
+//		asset_header Header;
+//		fread((char*)&Header, 1, sizeof(asset_header), file);
+//		LoadImage(file, Header, Path, Callback);
+//
+//		fclose(file);
+//	}
+//}

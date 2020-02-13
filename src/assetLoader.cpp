@@ -9,7 +9,41 @@
 #pragma warning( disable : 6386)
 #pragma warning( disable : 26444)
 
-const char* assetLoader::GetLowercaseFileExtension(char* Filename)
+extern std::vector<asset_type> AssetTypes;
+
+void assetLoader::AddAssetType(asset_type NewType)
+{
+	// verify id is unique and non zero
+	Assert(NewType.TypeID != 0);
+	for (asset_type& type : AssetTypes)
+	{
+		Assert(type.TypeID != NewType.TypeID);
+	}
+
+	AssetTypes.push_back(NewType);
+}
+
+asset_type& assetLoader::GetAssetTypeFromID(s32 TypeID)
+{
+	for (asset_type& type : AssetTypes)
+	{
+		if (type.TypeID == TypeID)
+			return type;
+	}
+
+	throw std::out_of_range("TypeID does not exist");
+}
+
+void assetLoader::SetAssetFieldsFromHeader(cAsset& Asset, asset_header& Header, std::string Path)
+{
+	Asset.AssetID = Header.ID;
+	Asset.Type = Header.Type;
+	Asset.DataSize = Header.RawDataSize;
+	strncpy(Asset.Filename, Header.Filename, MAX_PATH);
+	strncpy(Asset.Path, Path.c_str(), MAX_PATH);
+}
+
+std::string assetLoader::GetLowercaseFileExtension(char* Filename)
 {
 	std::locale loc;
 	int Length = (int)strlen(Filename);
@@ -22,28 +56,28 @@ const char* assetLoader::GetLowercaseFileExtension(char* Filename)
 	Checking.push_back(std::tolower(Filename[Length - 2], loc));
 	Checking.push_back(std::tolower(Filename[Length - 1], loc));
 
-	return Checking.c_str();
+	return Checking;
 }
 
-asset_type assetLoader::GetFileType(char* Filename)
+s32 assetLoader::GetFileTypeID(char* Filename)
 {
 	std::string Checking = GetLowercaseFileExtension(Filename);
 
 	if (Checking == "invalid")
-		return asset_type::Invalid;
+		return -1;
 
 	asset_settings set = GetAssetSettings();
 
-	if (Checking == "png" || Checking == "jpg" || Checking == "tga")
-		return asset_type::Texture;
-	else if (Checking == "ttf")
-		return asset_type::Font;
-	else if (Checking == set.AssetFileExtension)
-		return asset_type::AssetFile;
-	else if (Checking == "fbx")
-		return asset_type::Mesh;
-	else
-		return asset_type::Invalid;
+	if (Checking == set.AssetFileExtension) // asset file found
+		return 0;
+
+	for (asset_type& type : AssetTypes)
+	{
+		if (type.FileExtension == Checking)
+			return type.TypeID;
+	}
+
+	return -1;
 }
 
 // windows
@@ -56,6 +90,15 @@ char* LoadAllFileData(WIN32_FIND_DATA Data, const char* Path)
 	ifs.close();
 
 	return FileBuffer;
+}
+
+std::string RemoveFileAndGetNewPath(std::string Path)
+{
+	remove(Path.c_str());
+	Path.erase(Path.length() - 4, 4);
+	Path.push_back('.');
+	Path += GetAssetSettings().AssetFileExtension;
+	return Path;
 }
 
 bool assetLoader::CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2)
@@ -94,9 +137,8 @@ void assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream*
 
 		int FilenameSize = (int)Filename.length();
 		if (FilenameSize > 3) // make sure it isnt a random file
-		{
 			FoundFiles.push_back(data);
-		}
+
 	} while (FindNextFile(hFind, &data));
 	{
 		FindClose(hFind);
@@ -108,46 +150,99 @@ void assetLoader::IterateOverDirectory(const char* DirectoryPath, std::ofstream*
 	for (u32 i = 0; i < FoundFiles.size(); i++)
 	{
 		std::string Filename = FoundFiles[i].cFileName;
-		switch (GetFileType(FoundFiles[i].cFileName))
+
+		s32 TypeID = GetFileTypeID(FoundFiles[i].cFileName);
+		if (TypeID != -1)
 		{
-			case AssetFile:
+			std::string FullPath = (Path + FoundFiles[i].cFileName);
+
+			if (TypeID != 0) // 0 = type of asset file
 			{
-				if (GeneratePac)
+				asset_type& AssetType = GetAssetTypeFromID(TypeID);
+				char* Data = nullptr;
+				u32 RawDataSize = 0;
+				u32 TotalSize = (*AssetType.GetDataForWriting)(Data, RawDataSize, (char*)FullPath.c_str());
+
+				if (TotalSize > 0)
 				{
-					u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
-					std::ifstream ifs(Path + FoundFiles[i].cFileName, std::ifstream::binary);
-					char* FileBuffer = new char[filesize];
-					ifs.rdbuf()->sgetn(FileBuffer, filesize);
-					ofs->write(FileBuffer, filesize);
-					delete[] FileBuffer;
+					std::string NewPath = RemoveFileAndGetNewPath(FullPath);
+
+					(*ID)++;
+					asset_header Header;
+					Header.ID = *ID;
+					Header.Type = TypeID;
+					Header.RawDataSize = RawDataSize;
+					Header.TotalSize = TotalSize;
+
+					FILE* File;
+					File = fopen(NewPath.c_str(), "wb");
+					if (File)
+					{
+						fwrite((char*)&Header, sizeof(Header), 1, File);
+						fwrite(Data, sizeof(char), TotalSize, File);
+						fclose(File);
+					}
+
+					if (GeneratePac)
+					{
+						ofs->write((char*)&Header, sizeof(Header));
+						ofs->write(Data, TotalSize);
+					}
 				}
-			} break;
 
-			case Texture:
+				delete[] Data;
+			}
+			else if (GeneratePac) // copy file data into pac
 			{
-				(*ID)++;
-				PackImage((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
-			} break;
-
-			case Font:
-			{
-				// load file
-				char* FileBuffer = LoadAllFileData(FoundFiles[i], (Path + FoundFiles[i].cFileName).c_str());
-
-				(*ID)++;
-				PackFont((Path + data.cFileName), FileBuffer, Filename, *ID, ofs, GeneratePac);
+				u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
+				std::ifstream ifs(FullPath.c_str(), std::ifstream::binary);
+				char* FileBuffer = new char[filesize];
+				ifs.rdbuf()->sgetn(FileBuffer, filesize);
+				ofs->write(FileBuffer, filesize);
 				delete[] FileBuffer;
-			} break;
-
-			case Mesh:
-			{
-				(*ID)++;
-				PackMesh((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
-			} break;
-
-			default:
-			{ continue; } break;
+			}
 		}
+
+		//switch (GetFileType(FoundFiles[i].cFileName))
+		//{
+		//	case AssetFile:
+		//	{
+		//		if (GeneratePac)
+		//		{
+		//			u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
+		//			std::ifstream ifs(Path + FoundFiles[i].cFileName, std::ifstream::binary);
+		//			char* FileBuffer = new char[filesize];
+		//			ifs.rdbuf()->sgetn(FileBuffer, filesize);
+		//			ofs->write(FileBuffer, filesize);
+		//			delete[] FileBuffer;
+		//		}
+		//	} break;
+
+		//	case Texture:
+		//	{
+		//		(*ID)++;
+		//		PackImage((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
+		//	} break;
+
+		//	case Font:
+		//	{
+		//		// load file
+		//		char* FileBuffer = LoadAllFileData(FoundFiles[i], (Path + FoundFiles[i].cFileName).c_str());
+
+		//		(*ID)++;
+		//		PackFont((Path + data.cFileName), FileBuffer, Filename, *ID, ofs, GeneratePac);
+		//		delete[] FileBuffer;
+		//	} break;
+
+		//	case Mesh:
+		//	{
+		//		(*ID)++;
+		//		PackMesh((Path + FoundFiles[i].cFileName), Filename, *ID, ofs, GeneratePac);
+		//	} break;
+
+		//	default:
+		//	{ continue; } break;
+		//}
 	}
 }
 
@@ -175,6 +270,7 @@ void assetLoader::ScanAssets(const char* DirectoryPath, bool GeneratePac)
 
 		IterateOverDirectory("assets\\", &ofs, pak, Rebuild, GeneratePac, &ID);
 
+		// remove?
 		if (GeneratePac)
 		{
 			ofs.close();
@@ -204,38 +300,51 @@ void assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // as
 	FILE* pak = fopen(GetAssetSettings().PackFileName, "rb");
 	char Buffer[20];
 	s32 PrevIndex = -1;
-	asset_header SearchingHeader;
+	asset_header Header;
 	while (true) // iterate through assets (optimize?)
 	{
-		fread((char*)&SearchingHeader, 1, sizeof(SearchingHeader), pak);
-		if (PrevIndex == SearchingHeader.ID) // when all assets have been read
+		fread((char*)&Header, 1, sizeof(Header), pak);
+		if (PrevIndex == Header.ID) // when all assets have been read
 		{
 			fclose(pak);
 			return;
 		}
 		else
 		{
-			PrevIndex = SearchingHeader.ID;
-			int Position = ftell(pak) - sizeof(SearchingHeader);
+			PrevIndex = Header.ID;
+			int Position = ftell(pak) - sizeof(Header);
 			_snprintf_s(Buffer, sizeof(Buffer), "%d", Position);
 			std::string Path = Buffer;
 
-			switch (SearchingHeader.Type)
+			if (Header.Type != -1)
 			{
-				case Texture:
-				{ LoadImage(pak, SearchingHeader, Path, Callbacks->ImageCallback); } break;
+				asset_type& AssetType = GetAssetTypeFromID(Header.Type);
 
-				case Font:
-				{ LoadFont(pak, SearchingHeader, Path, Callbacks->FontCallback); } break;
+				char* Data = nullptr;
+				cAsset Asset;
+				SetAssetFieldsFromHeader(Asset, Header, Path);
 
-				case Mesh:
-				{ LoadMesh(pak, SearchingHeader, Path, Callbacks->MeshCallback); } break;
+				//todo: CALLBACK
+				fread(Data, sizeof(char), Header.TotalSize, pak);
 
-				default:
-				{} break;
+				(*AssetType.InitializeData)(&Asset, Data, Header.TotalSize);
 			}
 
-			fseek(pak, SearchingHeader.DataSize, SEEK_CUR); // set pos to next asset
+			//switch (Header.Type)
+			//{
+			//	case Texture:
+			//	{ LoadImage(pak, Header, Path, Callbacks->ImageCallback); } break;
+
+			//	case Font:
+			//	{ LoadFont(pak, Header, Path, Callbacks->FontCallback); } break;
+
+			//	case Mesh:
+			//	{ LoadMesh(pak, Header, Path, Callbacks->MeshCallback); } break;
+
+			//	default:
+			//	{} break;
+			//}
+			//fseek(pak, Header.DataSize, SEEK_CUR); // set pos to next asset
 		}
 	}
 }
@@ -257,16 +366,10 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 		int FilenameSize = (int)Filename.length();
 		if (FilenameSize > 3) // make sure it isnt a random file
 		{
-			switch (GetFileType(data.cFileName))
-			{
-			case AssetFile:
-			{
+			if (GetFileTypeID(data.cFileName) == 0) // asset file
 				FoundFiles.push_back(data);
-			} break;
-
-			default:
-			{ continue; } break;
-			}
+			else
+				continue;
 		}
 	} while (FindNextFile(hFind, &data));
 	{
@@ -279,25 +382,43 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 	for (u32 i = 0; i < FoundFiles.size(); i++)
 	{
 		FILE* file = fopen((Path + FoundFiles[i].cFileName).c_str(), "rb");
-		asset_header Header;
-		fread((char*)&Header, 1, sizeof(asset_header), file);
-		std::string FullPath = Path + FoundFiles[i].cFileName;
-
-		switch (Header.Type)
+		if (file)
 		{
-			case Texture:
-			{ LoadImage(file, Header, FullPath, Callbacks->ImageCallback); } break;
+			asset_header Header;
+			fread((char*)&Header, 1, sizeof(asset_header), file);
+			std::string FullPath = Path + FoundFiles[i].cFileName;
 
-			case Font:
-			{ LoadFont(file, Header, FullPath, Callbacks->FontCallback); } break;
+			if (Header.Type != -1)
+			{
+				asset_type& AssetType = GetAssetTypeFromID(Header.Type);
 
-			case Mesh:
-			{ LoadMesh(file, Header, FullPath, Callbacks->MeshCallback); } break;
+				cAsset Asset;
+				SetAssetFieldsFromHeader(Asset, Header, FullPath);
 
-			default:
-			{} break;
+				//todo: CALLBACK
+				char* Data = new char[Header.TotalSize];
+				fread(Data, sizeof(char), Header.TotalSize, file);
+
+				(*AssetType.InitializeData)(&Asset, Data, Header.TotalSize);
+				delete[] Data;
+			}
+			fclose(file);
 		}
-		fclose(file);
+
+		//switch (Header.Type)
+		//{
+		//	case Texture:
+		//	{ LoadImage(file, Header, FullPath, Callbacks->ImageCallback); } break;
+
+		//	case Font:
+		//	{ LoadFont(file, Header, FullPath, Callbacks->FontCallback); } break;
+
+		//	case Mesh:
+		//	{ LoadMesh(file, Header, FullPath, Callbacks->MeshCallback); } break;
+
+		//	default:
+		//	{} break;
+		//}
 	}
 }
 
@@ -307,32 +428,32 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 */
 void assetLoader::ExportAsset(cAsset* Asset)
 {
-	if (Asset->Loaded)
-	{
-		switch (Asset->Type)
-		{
-			default:
-			{} break;
+	//if (Asset->Loaded)
+	//{
+	//	switch (Asset->Type)
+	//	{
+	//		default:
+	//		{} break;
 
-			case Font:
-			{
-				//todo (not supported?)
-				cFontAsset* Font = (cFontAsset*)Asset;
-			} break;
+	//		case Font:
+	//		{
+	//			//todo (not supported?)
+	//			cFontAsset* Font = (cFontAsset*)Asset;
+	//		} break;
 
-			case Texture:
-			{
-				cTextureAsset* Tex = (cTextureAsset*)Asset;
-				stbi_write_png(Tex->Filename, Tex->Width, Tex->Height, Tex->Channels, Tex->Data, Tex->Width * Tex->Channels);
-			} break;
+	//		case Texture:
+	//		{
+	//			cTextureAsset* Tex = (cTextureAsset*)Asset;
+	//			stbi_write_png(Tex->Filename, Tex->Width, Tex->Height, Tex->Channels, Tex->Data, Tex->Width * Tex->Channels);
+	//		} break;
 
-			case Mesh:
-			{
-				// todo
-				cMeshAsset* Mesh = (cMeshAsset*)Asset;
-			} break;
-		}
-	}
+	//		case Mesh:
+	//		{
+	//			// todo
+	//			cMeshAsset* Mesh = (cMeshAsset*)Asset;
+	//		} break;
+	//	}
+	//}
 }
 
 #pragma warning( pop )

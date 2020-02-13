@@ -49,14 +49,15 @@ namespace assetLoader
 	void LoadFont(const char* Path, void (*Callback)(cFontAsset*));
 	void LoadMesh(const char* Path, void (*Callback)(cMeshAsset*));
 
-	// Returns type of file (if supported) from any filename, otherwise returns invalid
-	asset_type GetFileType(char* Filename);
+	// typeid 0 is always the type of the assetfile defined in asset_settings
+	void AddAssetType(asset_type NewType);
+	asset_type& GetAssetTypeFromID(s32 TypeID);
+
+	// Returns id of filetype (if supported) from any filename, otherwise returns -1
+	s32 GetFileTypeID(char* Filename);
 
 	// Exports loaded asset to exe directory
 	void ExportAsset(cAsset* Asset);
-
-	// Returns 3 character lowercase file extension from filename
-	const char* GetLowercaseFileExtension(char* Filename);
 
 #ifdef ASSET_DIRECTX11
 	// Call after LoadAssetData if asset has a texture (font, texture)

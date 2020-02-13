@@ -8,11 +8,7 @@
 
 static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Mesh" };
 static asset_settings AssetSettings;
-
-const char* GetStringFromAssetType(asset_type Type)
-{
-	return AssetTypeStrings[Type];
-}
+std::vector<asset_type> AssetTypes;
 
 asset_settings GetAssetSettings()
 {
@@ -22,6 +18,11 @@ asset_settings GetAssetSettings()
 void SetAssetSettings(asset_settings Settings)
 {
 	AssetSettings = Settings;
+}
+
+void cAsset::LoadAssetData(bool RefreshAsset)
+{
+
 }
 
 void cAsset::UnloadAsset()
@@ -52,7 +53,7 @@ void cTextureAsset::LoadAssetData(bool RefreshAsset) //todo: update method of lo
 	asset_header SearchingHeader;
 	fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
 
-	char* Pixels = new char[SearchingHeader.DataSize];
+	char* Pixels = new char[SearchingHeader.RawDataSize];
 
 	if (RefreshAsset)
 	{
@@ -61,12 +62,12 @@ void cTextureAsset::LoadAssetData(bool RefreshAsset) //todo: update method of lo
 		Width = png.Width;
 		Height = png.Height;
 		Channels = png.Channels;
-		DataSize = SearchingHeader.DataSize;
+		DataSize = SearchingHeader.RawDataSize;
 	}
 	else
 		fseek(pak, sizeof(png_pack), SEEK_CUR);
 
-	fread(Pixels, SearchingHeader.DataSize, 1, pak);
+	fread(Pixels, SearchingHeader.RawDataSize, 1, pak);
 
 	Loaded = true;
 	Data = Pixels;
@@ -91,29 +92,29 @@ void cTextureAsset::UnloadAsset()
 */
 void cFontAsset::LoadAssetData(bool RefreshAsset)
 {
-	if (Loaded)
-		UnloadAsset();
+	//if (Loaded)
+	//	UnloadAsset();
 
-	FILE* pak = nullptr;
-	if (AssetSettings.LoadFromPack)
-	{
-		pak = fopen(AssetSettings.PackFileName, "rb");
-		fseek(pak, atoi(Path), SEEK_SET);
-	}
-	else
-		pak = fopen(Path, "rb");
+	//FILE* pak = nullptr;
+	//if (AssetSettings.LoadFromPack)
+	//{
+	//	pak = fopen(AssetSettings.PackFileName, "rb");
+	//	fseek(pak, atoi(Path), SEEK_SET);
+	//}
+	//else
+	//	pak = fopen(Path, "rb");
 
-	asset_header SearchingHeader;
-	fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
+	//asset_header SearchingHeader;
+	//fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
 
-	char* Pixels = new char[SearchingHeader.DataSize];
-	fseek(pak, sizeof(font_pack) + SearchingHeader.ExtraSize, SEEK_CUR);
-	fread(Pixels, SearchingHeader.DataSize, 1, pak);
+	//char* Pixels = new char[SearchingHeader.RawDataSize];
+	//fseek(pak, sizeof(font_pack) + SearchingHeader.ExtraSize, SEEK_CUR);
+	//fread(Pixels, SearchingHeader.RawDataSize, 1, pak);
 
-	Loaded = true;
-	Data = Pixels;
+	//Loaded = true;
+	//Data = Pixels;
 
-	fclose(pak);
+	//fclose(pak);
 }
 
 void cFontAsset::UnloadAsset()
@@ -142,9 +143,9 @@ void cMeshAsset::LoadAssetData(bool RefreshAsset)
 	asset_header SearchingHeader;
 	fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
 
-	mesh_vertex* Vertices = new mesh_vertex[SearchingHeader.DataSize / sizeof(mesh_vertex)];
+	mesh_vertex* Vertices = new mesh_vertex[SearchingHeader.RawDataSize / sizeof(mesh_vertex)];
 	fseek(pak, sizeof(mesh_pack), SEEK_CUR);
-	fread(Vertices, SearchingHeader.DataSize, 1, pak);
+	fread(Vertices, SearchingHeader.RawDataSize, 1, pak);
 
 	Loaded = true;
 	Data = Vertices;

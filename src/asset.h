@@ -17,15 +17,6 @@ typedef uintptr_t uintptr;
 #define SAFE_RELEASE(Pointer) if(Pointer) {Pointer->Release();}
 #define Assert(Expression) if(!(Expression)) {*(int *)0 = 0;} // Dereference a NULL pointer
 
-enum asset_type // convert to class
-{ // ALWAYS add new types to the end or it will mess up all previously added assets
-	Invalid,
-	AssetFile,
-	Texture,
-	Font,
-	Mesh,
-};
-
 struct png_pack // change to texture_pack
 {
 	s32 Width;
@@ -77,18 +68,16 @@ struct asset_header
 {
 	s32 ID;
 	s32 Type;
-	u32 NextItem; // tells where the next asset starts
-	u32 ExtraSize; // extra value for extra data sizes
-	u32 DataSize; // tells the size of raw asset data
+	u32 TotalSize; // total size of extra data + raw data size, next asset starts after this
+	u32 RawDataSize; // tells the size of raw asset data
 	char Filename[MAX_PATH];
 
 	inline bool operator==(asset_header A)
 	{
 		if (A.ID == ID &&
 			A.Type == Type &&
-			A.NextItem == NextItem &&
-			A.ExtraSize == ExtraSize &&
-			A.DataSize == DataSize)
+			A.RawDataSize == RawDataSize &&
+			A.TotalSize == TotalSize)
 			return true;
 		else
 			return false;
@@ -125,24 +114,47 @@ struct mesh_vertex
 	f32 tx, ty, tz;
 };
 
-const char* GetStringFromAssetType(asset_type Type);
-
 asset_settings GetAssetSettings();
 void SetAssetSettings(asset_settings Settings);
 
 struct cAsset
 {
-	s32 AssetID; // deprecated
+	s32 AssetID; // internal use
 	b32 Active;
-	bool Loaded;
-	asset_type Type;
+	bool Loaded = false;
+	s32 Type;
 	void* Data = nullptr;
 	u32 DataSize;
 	char Filename[MAX_PATH];
 	char Path[MAX_PATH]; // if reading from pac this will be the position inside, otherwise it will be the path of the file
 
-	virtual void LoadAssetData(bool RefreshAsset = false) = 0; // refresh asset is basically like reinitializing it so use if new data is possibly different
+	void CopyFields(cAsset* Asset)
+	{
+		AssetID = Asset->AssetID;
+		Active = Asset->Active;
+		Loaded = Asset->Loaded;
+		Type = Asset->Type;
+		Data = Asset->Data;
+		DataSize = Asset->DataSize;
+		strcpy(Filename, Asset->Filename);
+		strcpy(Path, Asset->Path);
+	}
+
+	virtual void LoadAssetData(bool RefreshAsset = false); // refresh asset is basically like reinitializing it so use if new data is possibly different
 	virtual void UnloadAsset();
+};
+
+typedef u32(*t_GetDataForWriting)(char*&, u32&, char*); // must return total data size. char* is returned data and u32& is the size of the raw data
+typedef void(*t_InitializeData)(cAsset*, char*, u32); // cAsset*: base values for the asset, char*: data to be processed (same data exported in GetDataForWriting), u32: size of data
+
+struct asset_type
+{
+	s32 TypeID;
+	char TypeName[20];
+	char FileExtension[4];
+
+	t_GetDataForWriting GetDataForWriting;
+	t_InitializeData InitializeData;
 };
 
 struct cTextureAsset : public cAsset
