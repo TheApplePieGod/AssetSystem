@@ -1,4 +1,4 @@
-# AssetSystem
+# AssetSystem (CURRENTLY UNSTABLE)
 
 Open source, windows based, C++ library for game engines/applications to manage file based assets
 
