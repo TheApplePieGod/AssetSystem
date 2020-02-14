@@ -20,9 +20,33 @@ void SetAssetSettings(asset_settings Settings)
 	AssetSettings = Settings;
 }
 
-void cAsset::LoadAssetData(bool RefreshAsset)
+void cAsset::LoadAssetData()
 {
+	if (Loaded)
+		UnloadAsset();
 
+	FILE* File = nullptr;
+	if (AssetSettings.LoadFromPack)
+	{
+		File = fopen(AssetSettings.PackFileName, "rb");
+		fseek(File, atoi(Path), SEEK_SET);
+	}
+	else
+		File = fopen(Path, "rb");
+
+	asset_header Header;
+	fread((char*)&Header, sizeof(Header), 1, File);
+
+	char* LoadedData = new char[Header.RawDataSize];
+
+	fseek(File, Header.TotalSize - Header.RawDataSize, SEEK_CUR); // skip extra data
+
+	fread(LoadedData, Header.RawDataSize, 1, File);
+
+	Loaded = true;
+	Data = LoadedData; // data can be casted to any type later on
+
+	fclose(File);
 }
 
 void cAsset::UnloadAsset()
@@ -32,132 +56,21 @@ void cAsset::UnloadAsset()
 	Loaded = false;
 }
 
-/*
-* Unloads previous data
-* RefreshAsset: Reload texture dimensions from file
-*/
-void cTextureAsset::LoadAssetData(bool RefreshAsset) //todo: update method of loading / unloading (remove new)
-{
-	if (Loaded)
-		UnloadAsset();
-
-	FILE* pak = nullptr;
-	if (AssetSettings.LoadFromPack)
-	{
-		pak = fopen(AssetSettings.PackFileName, "rb");
-		fseek(pak, atoi(Path), SEEK_SET);
-	}
-	else
-		pak = fopen(Path, "rb");
-
-	asset_header SearchingHeader;
-	fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
-
-	char* Pixels = new char[SearchingHeader.RawDataSize];
-
-	if (RefreshAsset)
-	{
-		png_pack png;
-		fread((char*)&png, sizeof(png), 1, pak);
-		Width = png.Width;
-		Height = png.Height;
-		Channels = png.Channels;
-		DataSize = SearchingHeader.RawDataSize;
-	}
-	else
-		fseek(pak, sizeof(png_pack), SEEK_CUR);
-
-	fread(Pixels, SearchingHeader.RawDataSize, 1, pak);
-
-	Loaded = true;
-	Data = Pixels;
-
-	fclose(pak);
-}
-
 void cTextureAsset::UnloadAsset()
 {
+	cAsset::UnloadAsset();
 	SAFE_RELEASE(TextureHandle);
 	SAFE_RELEASE(ShaderHandle);
-	delete[] Data;
-	Data = nullptr;
 	TextureHandle = nullptr;
 	ShaderHandle = nullptr;
-	Loaded = false;
 }
 
-/*
-* Unloads previous data
-* RefreshAsset: todo
-*/
-void cFontAsset::LoadAssetData(bool RefreshAsset)
-{
-	//if (Loaded)
-	//	UnloadAsset();
-
-	//FILE* pak = nullptr;
-	//if (AssetSettings.LoadFromPack)
-	//{
-	//	pak = fopen(AssetSettings.PackFileName, "rb");
-	//	fseek(pak, atoi(Path), SEEK_SET);
-	//}
-	//else
-	//	pak = fopen(Path, "rb");
-
-	//asset_header SearchingHeader;
-	//fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
-
-	//char* Pixels = new char[SearchingHeader.RawDataSize];
-	//fseek(pak, sizeof(font_pack) + SearchingHeader.ExtraSize, SEEK_CUR);
-	//fread(Pixels, SearchingHeader.RawDataSize, 1, pak);
-
-	//Loaded = true;
-	//Data = Pixels;
-
-	//fclose(pak);
-}
 
 void cFontAsset::UnloadAsset()
 {
+	cAsset::UnloadAsset();
 	SAFE_RELEASE(AtlasShaderHandle);
-	delete[] Data;
-	Data = nullptr;
 	AtlasShaderHandle = nullptr;
-	Loaded = false;
-}
-
-void cMeshAsset::LoadAssetData(bool RefreshAsset)
-{
-	if (Loaded)
-		UnloadAsset();
-
-	FILE* pak = nullptr;
-	if (AssetSettings.LoadFromPack)
-	{
-		pak = fopen(AssetSettings.PackFileName, "rb");
-		fseek(pak, atoi(Path), SEEK_SET);
-	}
-	else
-		pak = fopen(Path, "rb");
-
-	asset_header SearchingHeader;
-	fread((char*)&SearchingHeader, sizeof(SearchingHeader), 1, pak);
-
-	mesh_vertex* Vertices = new mesh_vertex[SearchingHeader.RawDataSize / sizeof(mesh_vertex)];
-	fseek(pak, sizeof(mesh_pack), SEEK_CUR);
-	fread(Vertices, SearchingHeader.RawDataSize, 1, pak);
-
-	Loaded = true;
-	Data = Vertices;
-
-	fclose(pak);
-}
-
-void cMeshAsset::UnloadAsset()
-{
-	delete[] Data;
-	Data = nullptr;
-	Loaded = false;
 }
 
 #pragma warning( pop )

@@ -119,7 +119,7 @@ void SetAssetSettings(asset_settings Settings);
 
 struct cAsset
 {
-	s32 AssetID; // internal use
+	s32 AssetID; 	// internal use
 	b32 Active;
 	bool Loaded = false;
 	s32 Type;
@@ -140,7 +140,7 @@ struct cAsset
 		strcpy(Path, Asset->Path);
 	}
 
-	virtual void LoadAssetData(bool RefreshAsset = false); // refresh asset is basically like reinitializing it so use if new data is possibly different
+	virtual void LoadAssetData(); // refresh asset is basically like reinitializing it so use if new data is possibly different
 	virtual void UnloadAsset();
 };
 
@@ -169,7 +169,6 @@ struct cTextureAsset : public cAsset
 #endif
 
 	// Register texture with rendering sdk by calling assetLoader::Register(your_sdk)Texture
-	void LoadAssetData(bool RefreshAsset = false) override;
 	void UnloadAsset() override;
 };
 
@@ -187,7 +186,6 @@ struct cFontAsset : public cAsset
 	kern_entry* KernValues;
 
 	// Register atlas tex with rendering sdk by calling assetLoader::Register(your_sdk)Texture
-	void LoadAssetData(bool RefreshAsset = false) override;
 	void UnloadAsset() override;
 
 	inline char_entry FindCharEntryByAscii(u32 AsciiVal)
@@ -204,7 +202,4 @@ struct cFontAsset : public cAsset
 struct cMeshAsset : public cAsset
 {
 	u32 VertexCount;
-
-	void LoadAssetData(bool RefreshAsset = false) override;
-	void UnloadAsset() override;
 };

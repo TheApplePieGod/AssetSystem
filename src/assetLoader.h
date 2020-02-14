@@ -35,9 +35,7 @@ namespace assetLoader
 	* Does not generate/modify pack file; it must be recreated
 	* Returned path is newed, must be deleted after use
 	*/
-	const char* PackImage(const char* Path, int AssetID);
-	const char* PackFont(const char* Path, int AssetID);
-	const char* PackMesh(const char* Path, int AssetID);
+	//const char* PackImage(const char* Path, int AssetID);
 
 	/*
 	* Individually load assets from disk
@@ -45,9 +43,7 @@ namespace assetLoader
 	* only supported in debug mode
 	* (useful for dragging/dropping new assets)
 	*/
-	void LoadImage(const char* Path, void (*Callback)(cTextureAsset*));
-	void LoadFont(const char* Path, void (*Callback)(cFontAsset*));
-	void LoadMesh(const char* Path, void (*Callback)(cMeshAsset*));
+	//void LoadImage(const char* Path, void (*Callback)(cTextureAsset*));
 
 	// typeid 0 is always the type of the assetfile defined in asset_settings
 	void AddAssetType(asset_type NewType);
