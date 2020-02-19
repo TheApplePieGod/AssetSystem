@@ -1,10 +1,20 @@
 #include "pch.h"
 #include "../assetLoader.h"
-#include "../assetLoader_internal.h"
+#include "defaultAssetTypes.h"
 
 #include "../lib/stb_image.h"
 #include "../lib/stb_image_write.h"
 #include "../lib/stb_truetype.h"
+
+bool defaultAssetTypes::Font_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
+{
+	return true;
+}
+
+cAsset* defaultAssetTypes::Font_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
+{
+	return &cAsset();
+}
 
 ///*
 //* Returns new file path

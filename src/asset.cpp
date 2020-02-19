@@ -1,16 +1,18 @@
 #include "pch.h"
 #include "asset.h"
+#include "assets/defaultAssetTypes.h"
 
 #pragma warning( push )
 #pragma warning( disable : 6387)
 #pragma warning( disable : 6386)
 #pragma warning( disable : 26444)
 
-static const char* AssetTypeStrings[] = { "Invalid", "Asset File", "Texture", "Font", "Mesh" };
-static asset_settings AssetSettings;
+using namespace defaultAssetTypes;
+
+asset_settings AssetSettings;
 std::vector<asset_type> AssetTypes;
 
-asset_settings GetAssetSettings()
+asset_settings& GetAssetSettings()
 {
 	return AssetSettings;
 }
@@ -39,7 +41,7 @@ void cAsset::LoadAssetData()
 
 	char* LoadedData = new char[Header.RawDataSize];
 
-	fseek(File, Header.TotalSize - Header.RawDataSize, SEEK_CUR); // skip extra data
+	fseek(File, Header.ExtraDataSize, SEEK_CUR); // skip extra data
 
 	fread(LoadedData, Header.RawDataSize, 1, File);
 

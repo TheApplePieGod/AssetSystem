@@ -1,22 +1,11 @@
 #pragma once
 
-//TODO: update asset when filename changes
+//TODO: update asset when filename / path changes
 
 #include "asset.h"
 
-typedef void (*t_ImageCallback)(cTextureAsset*);
-typedef void (*t_FontCallback)(cFontAsset*);
-typedef void (*t_MeshCallback)(cMeshAsset*);
-
 namespace assetLoader
 {
-	struct asset_load_callbacks
-	{
-		t_ImageCallback ImageCallback;
-		t_FontCallback FontCallback;
-		t_MeshCallback MeshCallback;
-	};
-
 	/*
 	* Scan directory and convert assets to asset format
 	* GeneratePac: optionally generate the pack file
@@ -24,9 +13,9 @@ namespace assetLoader
 	void ScanAssets(const char* DirectoryPath, bool GeneratePac);
 
 	// Initialize/load asset files
-	void InitializeAssetsInDirectory(const char* DirectoryPath, asset_load_callbacks* Callbacks);
+	void InitializeAssetsInDirectory(const char* DirectoryPath);
 	// Pack file is assumed to be in the exe directory
-	void InitializeAssetsFromPac(asset_load_callbacks* Callbacks);
+	void InitializeAssetsFromPack();
 
 	/*
 	* Dynamically convert file into asset format on drive; returns new full path of the converted file
@@ -35,7 +24,7 @@ namespace assetLoader
 	* Does not generate/modify pack file; it must be recreated
 	* Returned path is newed, must be deleted after use
 	*/
-	//const char* PackImage(const char* Path, int AssetID);
+	//const char* PackImage(const char* Path, int AssetID); // todo: PackAsset
 
 	/*
 	* Individually load assets from disk
@@ -43,7 +32,7 @@ namespace assetLoader
 	* only supported in debug mode
 	* (useful for dragging/dropping new assets)
 	*/
-	//void LoadImage(const char* Path, void (*Callback)(cTextureAsset*));
+	//void LoadImage(const char* Path, void (*Callback)(cTextureAsset*)); // todo: LoadAsset
 
 	// typeid 0 is always the type of the assetfile defined in asset_settings
 	void AddAssetType(asset_type NewType);
@@ -52,11 +41,11 @@ namespace assetLoader
 	// Returns id of filetype (if supported) from any filename, otherwise returns -1
 	s32 GetFileTypeID(char* Filename);
 
-	// Exports loaded asset to exe directory
-	void ExportAsset(cAsset* Asset);
+	// Exports loaded asset to exe directory (todo)
+	//void ExportAsset(cAsset* Asset);
 
 #ifdef ASSET_DIRECTX11
-	// Call after LoadAssetData if asset has a texture (font, texture)
+	// Call after LoadAssetData, for use with default types (font, image)
 	void RegisterDXTexture(cAsset* Asset, bool GenerateMIPs, ID3D11Device* Device, ID3D11DeviceContext* DeviceContext);
 #endif
 }

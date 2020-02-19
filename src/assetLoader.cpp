@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "assetLoader.h"
-#include "assetLoader_internal.h"
 
 #include "../lib/stb_image_write.h"
 
@@ -73,8 +72,11 @@ s32 assetLoader::GetFileTypeID(char* Filename)
 
 	for (asset_type& type : AssetTypes)
 	{
-		if (type.FileExtension == Checking)
-			return type.TypeID;
+		for (u32 i = 0; i < MAX_FILE_EXTENSIONS; i++)
+		{
+			if (type.FileExtensions[i] == Checking)
+				return type.TypeID;
+		}
 	}
 
 	return -1;
@@ -159,11 +161,13 @@ void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool Ge
 			if (TypeID != 0) // 0 = type of asset file
 			{
 				asset_type& AssetType = assetLoader::GetAssetTypeFromID(TypeID);
-				char* Data = nullptr;
+				char* ExtraData = nullptr;
+				char* RawData = nullptr;
+				u32 ExtraDataSize = 0;
 				u32 RawDataSize = 0;
-				u32 TotalSize = (*AssetType.GetDataForWriting)(Data, RawDataSize, (char*)FullPath.c_str());
+				bool DeleteData = (*AssetType.GetDataForWriting)(ExtraData, RawData, ExtraDataSize, RawDataSize, (char*)FullPath.c_str());
 
-				if (TotalSize > 0)
+				if (ExtraDataSize + RawDataSize > 0)
 				{
 					std::string NewPath = RemoveFileAndGetNewPath(FullPath);
 
@@ -171,26 +175,34 @@ void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool Ge
 					asset_header Header;
 					Header.ID = *ID;
 					Header.Type = TypeID;
+					Header.FormatVersion = GetAssetSettings().FormatVersion;
+					Header.ExtraDataSize = ExtraDataSize;
 					Header.RawDataSize = RawDataSize;
-					Header.TotalSize = TotalSize;
+					strcpy(Header.Filename, FoundFiles[i].cFileName);
 
 					FILE* File;
 					File = fopen(NewPath.c_str(), "wb");
 					if (File)
 					{
 						fwrite((char*)&Header, sizeof(Header), 1, File);
-						fwrite(Data, sizeof(char), TotalSize, File);
+						fwrite(ExtraData, sizeof(char), ExtraDataSize, File);
+						fwrite(RawData, sizeof(char), RawDataSize, File);
 						fclose(File);
 					}
 
 					if (GeneratePac)
 					{
 						ofs->write((char*)&Header, sizeof(Header));
-						ofs->write(Data, TotalSize);
+						ofs->write(ExtraData, ExtraDataSize);
+						ofs->write(RawData, RawDataSize);
 					}
 				}
 
-				delete[] Data;
+				if (DeleteData)
+				{
+					delete[] ExtraData;
+					delete[] RawData;
+				}
 			}
 			else if (GeneratePac) // copy file data into pac
 			{
@@ -227,18 +239,18 @@ void InitializeNewAsset(asset_header& Header, std::string Path, FILE* File)
 {
 	asset_type& AssetType = assetLoader::GetAssetTypeFromID(Header.Type);
 
-	char* Data = nullptr;
+	char* ExtraData = new char[Header.ExtraDataSize];
 	cAsset Asset;
 	SetAssetFieldsFromHeader(Asset, Header, Path);
 
-	//todo: CALLBACK
-	fread(Data, sizeof(char), Header.TotalSize, File);
+	fread(ExtraData, sizeof(char), Header.ExtraDataSize, File);
 
-	(*AssetType.InitializeData)(&Asset, Data, Header.TotalSize);
-	delete[] Data;
+	cAsset* LoadedAsset = (*AssetType.InitializeData)(&Asset, ExtraData, Header.ExtraDataSize);
+	(*AssetType.LoadCallback)(LoadedAsset);
+	delete[] ExtraData;
 }
 
-void assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // assets should never change, so new is OK (later add int array of ids to load)
+void assetLoader::InitializeAssetsFromPack() // assets should never change, so new is OK (later add int array of ids to load)
 {
 	FILE* pak = fopen(GetAssetSettings().PackFileName, "rb");
 	char Buffer[20];
@@ -255,22 +267,22 @@ void assetLoader::InitializeAssetsFromPac(asset_load_callbacks* Callbacks) // as
 		else
 		{
 			PrevIndex = Header.ID;
-			int Position = ftell(pak) - sizeof(Header);
-			_snprintf_s(Buffer, sizeof(Buffer), "%d", Position);
-			std::string Path = Buffer;
 
-			if (Header.Type != -1)
+			if (Header.Type != -1 && Header.FormatVersion == GetAssetSettings().FormatVersion)
 			{
-				InitializeNewAsset(Header, Path, pak);
-				//fseek(pak, Header.DataSize, SEEK_CUR); // set pos to next asset
+				int Position = ftell(pak) - sizeof(Header);
+				_snprintf_s(Buffer, sizeof(Buffer), "%d", Position);
+				std::string PositionInPack = Buffer;
+
+				InitializeNewAsset(Header, PositionInPack, pak);
 			}
 			else
-				fseek(pak, Header.TotalSize, SEEK_CUR);
+				fseek(pak, (Header.ExtraDataSize + Header.RawDataSize), SEEK_CUR);
 		}
 	}
 }
 
-void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_load_callbacks* Callbacks)
+void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath)
 {
 	std::string Path = std::string(DirectoryPath);
 	WIN32_FIND_DATA data;
@@ -280,7 +292,7 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 	do
 	{
 		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0)
-			InitializeAssetsInDirectory((Path + data.cFileName + "\\").c_str(), Callbacks);
+			InitializeAssetsInDirectory((Path + data.cFileName + "\\").c_str());
 
 		std::string Filename = data.cFileName;
 
@@ -309,9 +321,9 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 			fread((char*)&Header, 1, sizeof(asset_header), File);
 			std::string FullPath = Path + FoundFiles[i].cFileName;
 
-			if (Header.Type != -1)
+			if (Header.Type != -1 && Header.FormatVersion == GetAssetSettings().FormatVersion)
 			{
-				InitializeNewAsset(Header, Path, File);
+				InitializeNewAsset(Header, FullPath, File);
 			}
 			fclose(File);
 		}
@@ -322,34 +334,34 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, asset_l
 * Export asset in exe directory
 * TODO: font export (save original file in asset file?)
 */
-void assetLoader::ExportAsset(cAsset* Asset)
-{
-	//if (Asset->Loaded)
-	//{
-	//	switch (Asset->Type)
-	//	{
-	//		default:
-	//		{} break;
-
-	//		case Font:
-	//		{
-	//			//todo (not supported?)
-	//			cFontAsset* Font = (cFontAsset*)Asset;
-	//		} break;
-
-	//		case Texture:
-	//		{
-	//			cTextureAsset* Tex = (cTextureAsset*)Asset;
-	//			stbi_write_png(Tex->Filename, Tex->Width, Tex->Height, Tex->Channels, Tex->Data, Tex->Width * Tex->Channels);
-	//		} break;
-
-	//		case Mesh:
-	//		{
-	//			// todo
-	//			cMeshAsset* Mesh = (cMeshAsset*)Asset;
-	//		} break;
-	//	}
-	//}
-}
+//void assetLoader::ExportAsset(cAsset* Asset)
+//{
+//	if (Asset->Loaded)
+//	{
+//		switch (Asset->Type)
+//		{
+//			default:
+//			{} break;
+//
+//			case Font:
+//			{
+//				//todo (not supported?)
+//				cFontAsset* Font = (cFontAsset*)Asset;
+//			} break;
+//
+//			case Texture:
+//			{
+//				cTextureAsset* Tex = (cTextureAsset*)Asset;
+//				stbi_write_png(Tex->Filename, Tex->Width, Tex->Height, Tex->Channels, Tex->Data, Tex->Width * Tex->Channels);
+//			} break;
+//
+//			case Mesh:
+//			{
+//				// todo
+//				cMeshAsset* Mesh = (cMeshAsset*)Asset;
+//			} break;
+//		}
+//	}
+//}
 
 #pragma warning( pop )
