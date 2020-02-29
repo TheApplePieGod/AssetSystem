@@ -53,9 +53,12 @@ void cAsset::LoadAssetData()
 
 void cAsset::UnloadAsset()
 {
-	delete[] Data;
-	Data = nullptr;
-	Loaded = false;
+	if (Loaded)
+	{
+		delete[] Data;
+		Data = nullptr;
+		Loaded = false;
+	}
 }
 
 void cTextureAsset::UnloadAsset()

@@ -10,10 +10,10 @@ namespace assetLoader
 	* Scan directory and convert assets to asset format
 	* GeneratePac: optionally generate the pack file
 	*/
-	void ScanAssets(const char* DirectoryPath, bool GeneratePac);
+	void ScanAssets(const char* DirectoryPath, bool GeneratePac, bool ScanNestedDirectories);
 
 	// Initialize/load asset files
-	void InitializeAssetsInDirectory(const char* DirectoryPath);
+	void InitializeAssetsInDirectory(const char* DirectoryPath, bool ScanNestedDirectories);
 	// Pack file is assumed to be in the exe directory
 	void InitializeAssetsFromPack();
 

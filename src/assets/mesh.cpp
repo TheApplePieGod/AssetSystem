@@ -2,20 +2,166 @@
 #include "../assetLoader.h"
 #include "defaultAssetTypes.h"
 
-bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
-{
-	return true;
-}
+#include "pch.h"
+#include "../assetLoader.h"
+#include "defaultAssetTypes.h"
 
-cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
-{
-	return &cAsset();
-}
-
-///*
-//* Returns new file path
-//*/
-//std::string assetLoader::PackMesh(std::string Path, std::string Filename, int AssetID, std::ofstream* ofs, bool GeneratePac)
+// multithreading not supported
+//void GetPolygonData(u32 StartingPolygon, u32 EndingPolygon, u32 DirectArrayIndex, std::vector<defaultAssetTypes::vertex>* LocalVertexArray, FbxMesh* pMesh)
+//{
+//	u32 ArrayIndex = 0;
+//	FbxVector4* lControlPoints = pMesh->GetControlPoints();
+//	for (u32 j = StartingPolygon; j < EndingPolygon; j++)
+//	{
+//		u32 NumVertices = pMesh->GetPolygonSize(j);
+//		//if (NumVertices != 3) // must be triangulated
+//		Assert(NumVertices == 3);
+//
+//		for (u32 k = 0; k < NumVertices; k++)
+//		{
+//			defaultAssetTypes::vertex vert = defaultAssetTypes::vertex();
+//			LocalVertexArray->push_back(vert);
+//
+//			//vertices data
+//			u32 ControlPointIndex = pMesh->GetPolygonVertex(j, k);
+//			FbxVector4 Vertex = lControlPoints[ControlPointIndex];
+//
+//			LocalVertexArray->at(ArrayIndex).position = defaultAssetTypes::v3{ (float)Vertex[0], (float)Vertex[1], (float)Vertex[2] };
+//
+//			//UV data
+//			u32 ElementUVCount = pMesh->GetElementUVCount();
+//			for (u32 l = 0; l < ElementUVCount; ++l)
+//			{
+//				FbxGeometryElementUV* leUV = pMesh->GetElementUV(l);
+//				FbxVector2 UV;
+//				switch (leUV->GetMappingMode())
+//				{
+//				default:
+//				{ }	break;
+//
+//				case FbxGeometryElement::eByControlPoint:
+//				{
+//					switch (leUV->GetReferenceMode())
+//					{
+//					case FbxGeometryElement::eDirect:
+//					{
+//						UV = leUV->GetDirectArray().GetAt(ControlPointIndex);
+//					} break;
+//
+//					case FbxGeometryElement::eIndexToDirect:
+//					{
+//						int id = leUV->GetIndexArray().GetAt(ControlPointIndex);
+//						UV = leUV->GetDirectArray().GetAt(id);
+//					} break;
+//
+//					default:
+//					{ }	break; // other reference modes not shown here!
+//					}
+//				} break;
+//
+//				case FbxGeometryElement::eByPolygonVertex:
+//				{
+//					int lTextureUVIndex = pMesh->GetTextureUVIndex(j, k);
+//					switch (leUV->GetReferenceMode())
+//					{
+//					case FbxGeometryElement::eDirect:
+//					case FbxGeometryElement::eIndexToDirect:
+//					{
+//						UV = leUV->GetDirectArray().GetAt(lTextureUVIndex);
+//					} break;
+//
+//					default:
+//					{ }	break; // other reference modes not shown here!
+//					}
+//				} break;
+//
+//				case FbxGeometryElement::eByPolygon: // doesn't make much sense for UVs
+//				case FbxGeometryElement::eAllSame:   // doesn't make much sense for UVs
+//				case FbxGeometryElement::eNone:       // doesn't make much sense for UVs
+//				{ }	break;
+//				}
+//
+//				LocalVertexArray->at(ArrayIndex).uv = defaultAssetTypes::v2{ (float)UV[0], (float)UV[1] };
+//			}
+//
+//			// normal data
+//			u32 ElementNormalCount = pMesh->GetElementNormalCount();
+//			if (ElementNormalCount == 0)
+//				pMesh->GenerateNormals();
+//			for (u32 l = 0; l < ElementNormalCount; ++l)
+//			{
+//				FbxVector4 Normal;
+//				FbxGeometryElementNormal* lNormalElement = pMesh->GetElementNormal(l);
+//				if (lNormalElement)
+//				{
+//					if (lNormalElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+//					{
+//						switch (lNormalElement->GetReferenceMode())
+//						{
+//						case FbxGeometryElement::eDirect:
+//						{
+//							Normal = lNormalElement->GetDirectArray().GetAt(DirectArrayIndex + ArrayIndex);
+//						} break;
+//
+//						case FbxGeometryElement::eIndexToDirect:
+//						{
+//							int id = lNormalElement->GetIndexArray().GetAt(DirectArrayIndex + ArrayIndex);
+//							Normal = lNormalElement->GetDirectArray().GetAt(id);
+//						} break;
+//
+//						default:
+//						{ }	break;
+//						}
+//					}
+//				}
+//
+//				// storing normals as float3s
+//				LocalVertexArray->at(ArrayIndex).normal = defaultAssetTypes::v3{ (float)Normal[0], (float)Normal[1], (float)Normal[2] };
+//			}
+//
+//			// tangent data
+//			//u32 ElementTangentCount = pMesh->GetElementTangentCount();
+//			//if (ElementTangentCount == 0)
+//			//	pMesh->GenerateTangentsDataForAllUVSets();
+//			//for (u32 l = 0; l < ElementTangentCount; ++l)
+//			//{
+//			//	FbxVector4 Tangent;
+//			//	FbxGeometryElementTangent* lTangentElement = pMesh->GetElementTangent(l);
+//			//	if (lTangentElement)
+//			//	{
+//			//		if (lTangentElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+//			//		{
+//			//			switch (lTangentElement->GetReferenceMode())
+//			//			{
+//			//			case FbxGeometryElement::eDirect:
+//			//			{
+//			//				Tangent = lTangentElement->GetDirectArray().GetAt(DirectArrayIndex + ArrayIndex); //?
+//			//			} break;
+//
+//			//			case FbxGeometryElement::eIndexToDirect:
+//			//			{
+//			//				int id = lTangentElement->GetIndexArray().GetAt(DirectArrayIndex + ArrayIndex);
+//			//				Tangent = lTangentElement->GetDirectArray().GetAt(id);
+//			//			} break;
+//
+//			//			default:
+//			//			{ }	break;
+//			//			}
+//			//		}
+//			//	}
+//
+//			//	// storing tangent as float3s
+//			//	VertexArray[ArrayIndex].tx = (float)Tangent[0];
+//			//	VertexArray[ArrayIndex].ty = (float)Tangent[1];
+//			//	VertexArray[ArrayIndex].tz = (float)Tangent[2];
+//			//}
+//
+//			ArrayIndex++;
+//		}
+//	}
+//}
+//
+//bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
 //{
 //	// Initialize the SDK manager. This object handles memory management.
 //	FbxManager* lSdkManager = FbxManager::Create();
@@ -28,10 +174,10 @@ cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* Extr
 //	FbxImporter* lImporter = FbxImporter::Create(lSdkManager, "");
 //
 //	// Use the first argument as the filename for the importer.
-//	if (!lImporter->Initialize(Path.c_str(), -1, lSdkManager->GetIOSettings())) {
-//		printf("Call to FbxImporter::Initialize() failed.\n");
+//	if (!lImporter->Initialize(FilePath, -1, lSdkManager->GetIOSettings())) {
+//		printf("FBX initialized failed with file %s\n", FilePath);
 //		printf("Error returned: %s\n\n", lImporter->GetStatus().GetErrorString());
-//		return "NULL";
+//		return false;
 //	}
 //
 //	// Create a new scene so that it can be populated by the imported file.
@@ -39,7 +185,7 @@ cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* Extr
 //
 //	// Import the contents of the file into the scene.
 //	if (!lImporter->Import(lScene))
-//		return "NULL";
+//		return false;
 //
 //	FbxGeometryConverter FbxConverter(lSdkManager);
 //	FbxAxisSystem AxisSystem = lScene->GetGlobalSettings().GetAxisSystem();
@@ -54,8 +200,12 @@ cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* Extr
 //	FbxNode* pFbxRootNode = lScene->GetRootNode();
 //	if (pFbxRootNode)
 //	{
-//		std::vector<mesh_vertex> VertexArray;
-//		u32 ArrayIndex = 0;
+//		std::vector<defaultAssetTypes::vertex> VertexArray;
+//
+//		int NumThreads = std::thread::hardware_concurrency();
+//		if (NumThreads == 0)
+//			NumThreads = 1;
+//
 //		for (int i = 0; i < pFbxRootNode->GetChildCount(); i++)
 //		{
 //			FbxNode* pFbxChildNode = pFbxRootNode->GetChild(i);
@@ -68,246 +218,365 @@ cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* Extr
 //			if (AttributeType != FbxNodeAttribute::eMesh) // only compatible with mesh types
 //				continue;
 //
-//			FbxMesh* pMesh = (FbxMesh*)pFbxChildNode->GetNodeAttribute();
+//			fbxsdk::FbxMesh* pMesh = (fbxsdk::FbxMesh*)pFbxChildNode->GetNodeAttribute();
 //
-//			FbxVector4* lControlPoints = pMesh->GetControlPoints();
+//			u32 CurrentPolygon = 0;
+//			u32 DirectArrayIndex = 0;
+//			u32 TotalPolygons = pMesh->GetPolygonCount();
+//			u32 PolygonsPerThread = (u32)(TotalPolygons / NumThreads);
+//			u32 Extra = TotalPolygons - (PolygonsPerThread * NumThreads);
 //
-//			u32 countd = pMesh->GetPolygonCount();
-//			for (s32 j = 0; j < pMesh->GetPolygonCount(); j++)
+//			std::vector<std::thread> threads(NumThreads);
+//			std::vector<std::vector<defaultAssetTypes::vertex>> LocalVertexArrays;
+//			for (int i = 0; i < NumThreads; i++)
 //			{
-//				u32 NumVertices = pMesh->GetPolygonSize(j);
-//				if (NumVertices != 3) // must be triangulated
-//					return "NULL";
+//				std::vector<defaultAssetTypes::vertex> LocalVertArray;
+//				LocalVertexArrays.push_back(LocalVertArray);
+//				threads[i] = std::thread(GetPolygonData, CurrentPolygon, CurrentPolygon + PolygonsPerThread + (i == NumThreads - 1 ? Extra : 0), DirectArrayIndex, &LocalVertexArrays[i], pMesh);
+//				DirectArrayIndex += PolygonsPerThread * 3; // triangles
+//				CurrentPolygon += PolygonsPerThread;
+//			}
 //
-//				for (u32 k = 0; k < NumVertices; k++)
-//					//for (s32 k = NumVertices - 1; k >= 0; k--)
+//			for (auto& th : threads)
+//				th.join();
+//
+//			for (std::vector<defaultAssetTypes::vertex>& VertArray : LocalVertexArrays)
+//			{
+//				for (defaultAssetTypes::vertex Vert : VertArray)
 //				{
-//					mesh_vertex vert = mesh_vertex();
-//					VertexArray.push_back(vert);
-//
-//					//vertices data
-//					u32 ControlPointIndex = pMesh->GetPolygonVertex(j, k);
-//					FbxVector4 Vertex = lControlPoints[ControlPointIndex];
-//
-//					VertexArray[ArrayIndex].x = (float)Vertex[0];
-//					VertexArray[ArrayIndex].y = (float)Vertex[1];
-//					VertexArray[ArrayIndex].z = (float)Vertex[2];
-//
-//					//UV data
-//					u32 ElementUVCount = pMesh->GetElementUVCount();
-//					for (u32 l = 0; l < ElementUVCount; ++l)
-//					{
-//						FbxGeometryElementUV* leUV = pMesh->GetElementUV(l);
-//						FbxVector2 UV;
-//						switch (leUV->GetMappingMode())
-//						{
-//						default:
-//						{ }	break;
-//
-//						case FbxGeometryElement::eByControlPoint:
-//						{
-//							switch (leUV->GetReferenceMode())
-//							{
-//							case FbxGeometryElement::eDirect:
-//							{
-//								UV = leUV->GetDirectArray().GetAt(ControlPointIndex);
-//							} break;
-//
-//							case FbxGeometryElement::eIndexToDirect:
-//							{
-//								int id = leUV->GetIndexArray().GetAt(ControlPointIndex);
-//								UV = leUV->GetDirectArray().GetAt(id);
-//							} break;
-//
-//							default:
-//							{ }	break; // other reference modes not shown here!
-//							}
-//						} break;
-//
-//						case FbxGeometryElement::eByPolygonVertex:
-//						{
-//							int lTextureUVIndex = pMesh->GetTextureUVIndex(j, k);
-//							switch (leUV->GetReferenceMode())
-//							{
-//							case FbxGeometryElement::eDirect:
-//							case FbxGeometryElement::eIndexToDirect:
-//							{
-//								UV = leUV->GetDirectArray().GetAt(lTextureUVIndex);
-//							} break;
-//
-//							default:
-//							{ }	break; // other reference modes not shown here!
-//							}
-//						} break;
-//
-//						case FbxGeometryElement::eByPolygon: // doesn't make much sense for UVs
-//						case FbxGeometryElement::eAllSame:   // doesn't make much sense for UVs
-//						case FbxGeometryElement::eNone:       // doesn't make much sense for UVs
-//						{ }	break;
-//						}
-//
-//						VertexArray[ArrayIndex].u = (float)UV[0];
-//						VertexArray[ArrayIndex].v = (float)UV[1]; // Invert V due to difference in coord systems between Maya and D3D
-//					}
-//
-//					// normal data
-//					u32 ElementNormalCount = pMesh->GetElementNormalCount();
-//					if (ElementNormalCount == 0)
-//						pMesh->GenerateNormals();
-//					for (u32 l = 0; l < ElementNormalCount; ++l)
-//					{
-//						FbxVector4 Normal;
-//						FbxGeometryElementNormal* lNormalElement = pMesh->GetElementNormal(l);
-//						if (lNormalElement)
-//						{
-//							if (lNormalElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
-//							{
-//								switch (lNormalElement->GetReferenceMode())
-//								{
-//								case FbxGeometryElement::eDirect:
-//								{
-//									Normal = lNormalElement->GetDirectArray().GetAt(ArrayIndex);
-//								} break;
-//
-//								case FbxGeometryElement::eIndexToDirect:
-//								{
-//									int id = lNormalElement->GetIndexArray().GetAt(ArrayIndex);
-//									Normal = lNormalElement->GetDirectArray().GetAt(id);
-//								} break;
-//
-//								default:
-//								{ }	break;
-//								}
-//							}
-//						}
-//
-//						// storing normals as float3s
-//						VertexArray[ArrayIndex].nx = (float)Normal[0];
-//						VertexArray[ArrayIndex].ny = (float)Normal[1];
-//						VertexArray[ArrayIndex].nz = (float)Normal[2];
-//					}
-//
-//					// tangent data
-//					u32 ElementTangentCount = pMesh->GetElementTangentCount();
-//					if (ElementTangentCount == 0)
-//						pMesh->GenerateTangentsDataForAllUVSets();
-//					for (u32 l = 0; l < ElementTangentCount; ++l)
-//					{
-//						FbxVector4 Tangent;
-//						FbxGeometryElementTangent* lTangentElement = pMesh->GetElementTangent(l);
-//						if (lTangentElement)
-//						{
-//							if (lTangentElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
-//							{
-//								switch (lTangentElement->GetReferenceMode())
-//								{
-//								case FbxGeometryElement::eDirect:
-//								{
-//									Tangent = lTangentElement->GetDirectArray().GetAt(ArrayIndex); //?
-//								} break;
-//
-//								case FbxGeometryElement::eIndexToDirect:
-//								{
-//									int id = lTangentElement->GetIndexArray().GetAt(ArrayIndex);
-//									Tangent = lTangentElement->GetDirectArray().GetAt(id);
-//								} break;
-//
-//								default:
-//								{ }	break;
-//								}
-//							}
-//						}
-//
-//						// storing tangent as float3s
-//						VertexArray[ArrayIndex].tx = (float)Tangent[0];
-//						VertexArray[ArrayIndex].ty = (float)Tangent[1];
-//						VertexArray[ArrayIndex].tz = (float)Tangent[2];
-//					}
-//
-//					ArrayIndex++;
+//					VertexArray.push_back(Vert);
 //				}
 //			}
 //		}
 //
-//		mesh_pack MeshPack;
-//		MeshPack.NumVertices = (u32)VertexArray.size();
-//
-//		asset_header Header;
-//		Header.ID = AssetID;
-//		Header.Type = asset_type::Mesh;
-//		Header.DataSize = MeshPack.NumVertices * sizeof(mesh_vertex);
-//		Header.ExtraSize = 0;
-//		Header.NextItem = sizeof(mesh_pack) + Header.DataSize;
-//		strcpy(Header.Filename, Filename.c_str());
-//
-//		if (ofs != nullptr)
+//		for (u32 i = 0; i < (u32)VertexArray.size(); i += 3) // calculate tangents
 //		{
-//			if (GeneratePac)
-//			{
-//				ofs->write((char*)&Header, sizeof(asset_header));
-//				ofs->write((char*)&MeshPack, sizeof(mesh_pack));
-//				ofs->write((char*)VertexArray.data(), Header.DataSize);
-//			}
+//			defaultAssetTypes::vertex& v0 = VertexArray[i];
+//			defaultAssetTypes::vertex& v1 = VertexArray[i + 1];
+//			defaultAssetTypes::vertex& v2 = VertexArray[i + 2];
+//
+//			defaultAssetTypes::v3 pos0 = v0.position;
+//			defaultAssetTypes::v3 pos1 = v1.position;
+//			defaultAssetTypes::v3 pos2 = v2.position;
+//
+//			defaultAssetTypes::v2 uv0 = v0.uv;
+//			defaultAssetTypes::v2 uv1 = v1.uv;
+//			defaultAssetTypes::v2 uv2 = v2.uv;
+//
+//			// Position delta
+//			defaultAssetTypes::v3 deltaPos1 = pos1 - pos0;
+//			defaultAssetTypes::v3 deltaPos2 = pos2 - pos0;
+//
+//			// UV delta
+//			defaultAssetTypes::v2 deltaUV1 = uv1 - uv0;
+//			defaultAssetTypes::v2 deltaUV2 = uv2 - uv0;
+//
+//			float r = 1.0f / (deltaUV1.u * deltaUV2.v - deltaUV1.v * deltaUV2.u);
+//			defaultAssetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
+//			defaultAssetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
+//
+//			v0.tangent = tangent;
+//			v1.tangent = tangent;
+//			v2.tangent = tangent;
+//
+//			v0.bitangent = bitangent;
+//			v1.bitangent = bitangent;
+//			v2.bitangent = bitangent;
 //		}
 //
-//		remove(Path.c_str());
-//		std::string NewPath = Path;
-//		NewPath.erase(NewPath.length() - 4, 4);
-//		NewPath.push_back('.');
-//		NewPath += GetAssetSettings().AssetFileExtension;
-//		FILE* file;
-//		file = fopen(NewPath.c_str(), "wb");
-//		if (file)
-//		{
-//			fwrite((char*)&Header, sizeof(asset_header), 1, file);
-//			fwrite((char*)&MeshPack, sizeof(mesh_pack), 1, file);
-//			fwrite((char*)VertexArray.data(), sizeof(char), Header.DataSize, file);
-//			fclose(file);
-//		}
+//		mesh_data MeshData;
+//		MeshData.NumVertices = (u32)VertexArray.size();
 //
-//		return NewPath;
+//		u32 DataLength = MeshData.NumVertices * sizeof(defaultAssetTypes::vertex);
+//		u32 ExtraSize = sizeof(MeshData);
+//
+//		// Set fields
+//		Out_ExtraData = new char[ExtraSize];
+//		memcpy(Out_ExtraData, &MeshData, ExtraSize);
+//		Out_RawData = new char[DataLength]; // Allocate new array since std::vector auto deletes data
+//		memcpy(Out_RawData, (char*)VertexArray.data(), DataLength);
+//		Out_ExtraDataSize = ExtraSize;
+//		Out_RawDataSize = DataLength;
+//		
+//		return true;
 //	}
 //	else
-//		return "NULL";
+//		return false;
 //}
-//
-//const char* assetLoader::PackMesh(const char* Path, int AssetID)
-//{
-//	WIN32_FIND_DATA data;
-//	HANDLE hFind = FindFirstFile(Path, &data);
-//
-//	std::string ret = assetLoader::PackMesh(Path, data.cFileName, AssetID);
-//	char* retptr = new char[ret.size() + 1];
-//	strcpy(retptr, ret.c_str());
-//
-//	return retptr;
-//}
-//
-//void assetLoader::LoadMesh(FILE* File, asset_header& Header, std::string Path, void (*Callback)(cMeshAsset*))
-//{
-//	mesh_pack reading;
-//	size_t d = fread((char*)&reading, sizeof(reading), 1, File);
-//	cMeshAsset* MeshAsset = new cMeshAsset;
-//	MeshAsset->AssetID = Header.ID;
-//	MeshAsset->Type = asset_type::Mesh;
-//	MeshAsset->DataSize = Header.DataSize;
-//	MeshAsset->VertexCount = reading.NumVertices;
-//	strncpy(MeshAsset->Filename, Header.Filename, MAX_PATH);
-//	strncpy(MeshAsset->Path, Path.c_str(), MAX_PATH);
-//	MeshAsset->LoadAssetData();
-//
-//	(*Callback)(MeshAsset);
-//}
-//
-//void assetLoader::LoadMesh(const char* Path, void (*Callback)(cMeshAsset*))
-//{
-//	FILE* file = fopen(Path, "rb");
-//	if (file)
-//	{
-//		asset_header Header;
-//		fread((char*)&Header, 1, sizeof(asset_header), file);
-//		LoadMesh(file, Header, Path, Callback);
-//
-//		fclose(file);
-//	}
-//}
+
+bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
+{
+	// Initialize the SDK manager. This object handles memory management.
+	FbxManager* lSdkManager = FbxManager::Create();
+
+	// Create the IO settings object.
+	FbxIOSettings* ios = FbxIOSettings::Create(lSdkManager, IOSROOT);
+	lSdkManager->SetIOSettings(ios);
+
+	// Create an importer using the SDK manager.
+	FbxImporter* lImporter = FbxImporter::Create(lSdkManager, "");
+
+	// Use the first argument as the filename for the importer.
+	if (!lImporter->Initialize(FilePath, -1, lSdkManager->GetIOSettings())) {
+		printf("FBX initialized failed with file %s\n", FilePath);
+		printf("Error returned: %s\n\n", lImporter->GetStatus().GetErrorString());
+		return false;
+	}
+
+	// Create a new scene so that it can be populated by the imported file.
+	FbxScene* lScene = FbxScene::Create(lSdkManager, "myScene");
+
+	// Import the contents of the file into the scene.
+	if (!lImporter->Import(lScene))
+		return false;
+
+	FbxGeometryConverter FbxConverter(lSdkManager);
+	FbxAxisSystem AxisSystem = lScene->GetGlobalSettings().GetAxisSystem();
+#ifdef ASSET_DIRECTX11
+	FbxAxisSystem::DirectX.ConvertScene(lScene);
+#endif
+	FbxConverter.Triangulate(lScene, true);
+
+	// The file is imported, so get rid of the importer.
+	lImporter->Destroy();
+
+	FbxNode* pFbxRootNode = lScene->GetRootNode();
+	if (pFbxRootNode)
+	{
+		std::vector<defaultAssetTypes::vertex> VertexArray;
+		u32 ArrayIndex = 0;
+		for (int i = 0; i < pFbxRootNode->GetChildCount(); i++)
+		{
+			FbxNode* pFbxChildNode = pFbxRootNode->GetChild(i);
+
+			if (pFbxChildNode->GetNodeAttribute() == NULL)
+				continue;
+
+			FbxNodeAttribute::EType AttributeType = pFbxChildNode->GetNodeAttribute()->GetAttributeType();
+
+			if (AttributeType != FbxNodeAttribute::eMesh) // only compatible with mesh types
+				continue;
+
+			fbxsdk::FbxMesh* pMesh = (fbxsdk::FbxMesh*)pFbxChildNode->GetNodeAttribute();
+
+			FbxVector4* lControlPoints = pMesh->GetControlPoints();
+
+			u32 countd = pMesh->GetPolygonCount();
+			for (s32 j = 0; j < pMesh->GetPolygonCount(); j++)
+			{
+				u32 NumVertices = pMesh->GetPolygonSize(j);
+				if (NumVertices != 3) // must be triangulated
+					return false;
+
+				for (u32 k = 0; k < NumVertices; k++)
+					//for (s32 k = NumVertices - 1; k >= 0; k--)
+				{
+					defaultAssetTypes::vertex vert = defaultAssetTypes::vertex();
+					VertexArray.push_back(vert);
+
+					//vertices data
+					u32 ControlPointIndex = pMesh->GetPolygonVertex(j, k);
+					FbxVector4 Vertex = lControlPoints[ControlPointIndex];
+
+					VertexArray[ArrayIndex].position = v3{ (float)Vertex[0], (float)Vertex[1], (float)Vertex[2] };
+
+					//UV data
+					u32 ElementUVCount = pMesh->GetElementUVCount();
+					for (u32 l = 0; l < ElementUVCount; ++l)
+					{
+						FbxGeometryElementUV* leUV = pMesh->GetElementUV(l);
+						FbxVector2 UV;
+						switch (leUV->GetMappingMode())
+						{
+						default:
+						{ }	break;
+
+						case FbxGeometryElement::eByControlPoint:
+						{
+							switch (leUV->GetReferenceMode())
+							{
+							case FbxGeometryElement::eDirect:
+							{
+								UV = leUV->GetDirectArray().GetAt(ControlPointIndex);
+							} break;
+
+							case FbxGeometryElement::eIndexToDirect:
+							{
+								int id = leUV->GetIndexArray().GetAt(ControlPointIndex);
+								UV = leUV->GetDirectArray().GetAt(id);
+							} break;
+
+							default:
+							{ }	break; // other reference modes not shown here!
+							}
+						} break;
+
+						case FbxGeometryElement::eByPolygonVertex:
+						{
+							int lTextureUVIndex = pMesh->GetTextureUVIndex(j, k);
+							switch (leUV->GetReferenceMode())
+							{
+							case FbxGeometryElement::eDirect:
+							case FbxGeometryElement::eIndexToDirect:
+							{
+								UV = leUV->GetDirectArray().GetAt(lTextureUVIndex);
+							} break;
+
+							default:
+							{ }	break; // other reference modes not shown here!
+							}
+						} break;
+
+						case FbxGeometryElement::eByPolygon: // doesn't make much sense for UVs
+						case FbxGeometryElement::eAllSame:   // doesn't make much sense for UVs
+						case FbxGeometryElement::eNone:       // doesn't make much sense for UVs
+						{ }	break;
+						}
+
+						VertexArray[ArrayIndex].uv = v2{ (float)UV[0], (float)UV[1] };
+					}
+
+					// normal data
+					u32 ElementNormalCount = pMesh->GetElementNormalCount();
+					if (ElementNormalCount == 0)
+						pMesh->GenerateNormals();
+					for (u32 l = 0; l < ElementNormalCount; ++l)
+					{
+						FbxVector4 Normal;
+						FbxGeometryElementNormal* lNormalElement = pMesh->GetElementNormal(l);
+						if (lNormalElement)
+						{
+							if (lNormalElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+							{
+								switch (lNormalElement->GetReferenceMode())
+								{
+								case FbxGeometryElement::eDirect:
+								{
+									Normal = lNormalElement->GetDirectArray().GetAt(ArrayIndex);
+								} break;
+
+								case FbxGeometryElement::eIndexToDirect:
+								{
+									int id = lNormalElement->GetIndexArray().GetAt(ArrayIndex);
+									Normal = lNormalElement->GetDirectArray().GetAt(id);
+								} break;
+
+								default:
+								{ }	break;
+								}
+							}
+						}
+
+						// storing normals as float3s
+						VertexArray[ArrayIndex].normal = v3{ (float)Normal[0], (float)Normal[1], (float)Normal[2] };
+					}
+
+					// tangent data
+					//u32 ElementTangentCount = pMesh->GetElementTangentCount();
+					//if (ElementTangentCount == 0)
+					//	pMesh->GenerateTangentsDataForAllUVSets();
+					//for (u32 l = 0; l < ElementTangentCount; ++l)
+					//{
+					//	FbxVector4 Tangent;
+					//	FbxGeometryElementTangent* lTangentElement = pMesh->GetElementTangent(l);
+					//	if (lTangentElement)
+					//	{
+					//		if (lTangentElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+					//		{
+					//			switch (lTangentElement->GetReferenceMode())
+					//			{
+					//			case FbxGeometryElement::eDirect:
+					//			{
+					//				Tangent = lTangentElement->GetDirectArray().GetAt(ArrayIndex); //?
+					//			} break;
+
+					//			case FbxGeometryElement::eIndexToDirect:
+					//			{
+					//				int id = lTangentElement->GetIndexArray().GetAt(ArrayIndex);
+					//				Tangent = lTangentElement->GetDirectArray().GetAt(id);
+					//			} break;
+
+					//			default:
+					//			{ }	break;
+					//			}
+					//		}
+					//	}
+
+					//	// storing tangent as float3s
+					//	VertexArray[ArrayIndex].tx = (float)Tangent[0];
+					//	VertexArray[ArrayIndex].ty = (float)Tangent[1];
+					//	VertexArray[ArrayIndex].tz = (float)Tangent[2];
+					//}
+
+					ArrayIndex++;
+				}
+			}
+		}
+
+		for (u32 i = 0; i < (u32)VertexArray.size(); i += 3) // calculate tangents
+		{
+			defaultAssetTypes::vertex& v0 = VertexArray[i];
+			defaultAssetTypes::vertex& v1 = VertexArray[i + 1];
+			defaultAssetTypes::vertex& v2 = VertexArray[i + 2];
+
+			defaultAssetTypes::v3 pos0 = v0.position;
+			defaultAssetTypes::v3 pos1 = v1.position;
+			defaultAssetTypes::v3 pos2 = v2.position;
+
+			defaultAssetTypes::v2 uv0 = v0.uv;
+			defaultAssetTypes::v2 uv1 = v1.uv;
+			defaultAssetTypes::v2 uv2 = v2.uv;
+
+			// Position delta
+			defaultAssetTypes::v3 deltaPos1 = pos1 - pos0;
+			defaultAssetTypes::v3 deltaPos2 = pos2 - pos0;
+
+			// UV delta
+			defaultAssetTypes::v2 deltaUV1 = uv1 - uv0;
+			defaultAssetTypes::v2 deltaUV2 = uv2 - uv0;
+
+			float r = 1.0f / (deltaUV1.u * deltaUV2.v - deltaUV1.v * deltaUV2.u);
+			defaultAssetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
+			defaultAssetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
+
+			v0.tangent = tangent;
+			v1.tangent = tangent;
+			v2.tangent = tangent;
+
+			v0.bitangent = bitangent;
+			v1.bitangent = bitangent;
+			v2.bitangent = bitangent;
+		}
+
+		mesh_data MeshData;
+		MeshData.NumVertices = (u32)VertexArray.size();
+
+		u32 DataLength = MeshData.NumVertices * sizeof(defaultAssetTypes::vertex);
+		u32 ExtraSize = sizeof(MeshData);
+
+		// Set fields
+		Out_ExtraData = new char[ExtraSize];
+		memcpy(Out_ExtraData, &MeshData, ExtraSize);
+		Out_RawData = new char[DataLength]; // Allocate new array since std::vector auto deletes data
+		memcpy(Out_RawData, (char*)VertexArray.data(), DataLength);
+		Out_ExtraDataSize = ExtraSize;
+		Out_RawDataSize = DataLength;
+		
+		return true;
+	}
+	else
+		return false;
+}
+
+cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
+{
+	mesh_data MeshData = *((mesh_data*)ExtraData);
+	cMeshAsset* MeshAsset = new cMeshAsset();
+	MeshAsset->CopyFields(AssetDefaults);
+
+	MeshAsset->MeshData = MeshData;
+
+	MeshAsset->LoadAssetData();
+
+	return MeshAsset;
+}

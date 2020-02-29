@@ -52,27 +52,94 @@ namespace defaultAssetTypes
 		s32 TopLeftOffsetY;
 	};
 
+	union v2
+	{
+		struct
+		{
+			f32 x, y;
+		};
+		struct
+		{
+			f32 u, v;
+		};
+		f32 E[2];
+	};
+
+	inline v2
+	operator-(v2 A, v2 B)
+	{
+		v2 Result;
+
+		Result.x = A.x - B.x;
+		Result.y = A.y - B.y;
+
+		return(Result);
+	}
+
+	union v3
+	{
+		struct
+		{
+			f32 x, y, z;
+		};
+		struct
+		{
+			f32 u, v, w;
+		};
+		struct
+		{
+			f32 r, g, b;
+		};
+		f32 E[3];
+	};
+
+	inline v3
+	operator-(v3 A, v3 B)
+	{
+		v3 Result;
+
+		Result.x = A.x - B.x;
+		Result.y = A.y - B.y;
+		Result.z = A.z - B.z;
+
+		return(Result);
+	}
+
+	inline v3
+	operator*(v3 A, f32 B)
+	{
+		v3 Result;
+
+		Result.x = A.x * B;
+		Result.y = A.x * B;
+		Result.z = A.x * B;
+
+		return(Result);
+	}
+
 	bool Font_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath);
 	cAsset* Font_InitializeData(cAsset* AssetDefaults, char* Data, u32 DataSize);
 
 	static asset_type FontType = { 2, "Font", {"ttf"}, Font_GetDataForWriting, Font_InitializeData }; // Set callback separately
-
 
 	// mesh
 	// Structure used when storing vertices from imported mesh
 	struct vertex
 	{
 		// Position in x/y plane
-		f32 x, y, z;
+		v3 position;
 
 		// UV coordinates
-		f32 u, v;
+		v2 uv;
 
 		// Normals
-		f32 nx, ny, nz;
+		v3 normal;
 
 		// Tangents
-		f32 tx, ty, tz;
+		v3 tangent;
+
+		// Bitangent
+		v3 bitangent;
 	};
 
 	struct mesh_data

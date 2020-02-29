@@ -17,7 +17,7 @@ bool defaultAssetTypes::Image_GetDataForWriting(char*& Out_ExtraData, char*& Out
 	
 	// stb couldn't load image (probably corrupt)
 	if (PixelData == nullptr)
-		return 0;
+		return false;
 	
 	ImageData.Channels = 4;  // makes every loaded texture have 4 channels
 	u32 DataLength = ImageData.Width * ImageData.Height * ImageData.Channels;

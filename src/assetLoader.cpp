@@ -103,7 +103,7 @@ std::string RemoveFileAndGetNewPath(std::string Path)
 	return Path;
 }
 
-bool CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2)
+bool CompareFiles(WIN32_FIND_DATA& f1, WIN32_FIND_DATA& f2)
 {
 	wchar_t wtext[MAX_PATH];
 	mbstowcs(wtext, f1.cFileName, MAX_PATH + 1);//Plus null
@@ -123,7 +123,7 @@ bool CompareFiles(WIN32_FIND_DATA f1, WIN32_FIND_DATA f2)
 		return true;
 }
 
-void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool GeneratePac, int* ID)
+void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool GeneratePac, int* ID, bool ScanNestedDirectories)
 {
 	std::string Path = std::string(DirectoryPath);
 	WIN32_FIND_DATA data;
@@ -132,15 +132,19 @@ void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool Ge
 
 	do
 	{
-		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0)
-			IterateOverDirectory((Path + data.cFileName + "\\").c_str(), ofs, GeneratePac, ID);
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0) // sub folder found
+		{
+			if (ScanNestedDirectories)
+				IterateOverDirectory((Path + data.cFileName + "\\").c_str(), ofs, GeneratePac, ID, ScanNestedDirectories);
+		}
+		else
+		{
+			std::string Filename = data.cFileName;
 
-		std::string Filename = data.cFileName;
-
-		int FilenameSize = (int)Filename.length();
-		if (FilenameSize > 3) // make sure it isnt a random file
-			FoundFiles.push_back(data);
-
+			int FilenameSize = (int)Filename.length();
+			if (FilenameSize > 3) // make sure it isnt a random file
+				FoundFiles.push_back(data);
+		}
 	} while (FindNextFile(hFind, &data));
 	{
 		FindClose(hFind);
@@ -217,7 +221,7 @@ void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool Ge
 	}
 }
 
-void assetLoader::ScanAssets(const char* DirectoryPath, bool GeneratePac)
+void assetLoader::ScanAssets(const char* DirectoryPath, bool GeneratePac, bool ScanNestedDirectories)
 {
 	std::string Path = std::string(DirectoryPath);
 	std::ofstream ofs;
@@ -230,7 +234,7 @@ void assetLoader::ScanAssets(const char* DirectoryPath, bool GeneratePac)
 		if (GeneratePac)
 			ofs.open(GetAssetSettings().PackFileName, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
 
-		IterateOverDirectory("assets\\", &ofs, GeneratePac, &ID);
+		IterateOverDirectory("assets\\", &ofs, GeneratePac, &ID, ScanNestedDirectories);
 	}
 }
 
@@ -282,7 +286,7 @@ void assetLoader::InitializeAssetsFromPack() // assets should never change, so n
 	}
 }
 
-void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath)
+void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, bool ScanNestedDirectories)
 {
 	std::string Path = std::string(DirectoryPath);
 	WIN32_FIND_DATA data;
@@ -291,18 +295,23 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath)
 
 	do
 	{
-		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0)
-			InitializeAssetsInDirectory((Path + data.cFileName + "\\").c_str());
-
-		std::string Filename = data.cFileName;
-
-		int FilenameSize = (int)Filename.length();
-		if (FilenameSize > 3) // make sure it isnt a random file
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0) // sub folder found
 		{
-			if (GetFileTypeID(data.cFileName) == 0) // asset file
-				FoundFiles.push_back(data);
-			else
-				continue;
+			if (ScanNestedDirectories)
+				InitializeAssetsInDirectory((Path + data.cFileName + "\\").c_str(), ScanNestedDirectories);
+		}
+		else
+		{
+			std::string Filename = data.cFileName;
+
+			int FilenameSize = (int)Filename.length();
+			if (FilenameSize > 3) // make sure it isnt a random file
+			{
+				if (GetFileTypeID(data.cFileName) == 0) // asset file
+					FoundFiles.push_back(data);
+				else
+					continue;
+			}
 		}
 	} while (FindNextFile(hFind, &data));
 	{
