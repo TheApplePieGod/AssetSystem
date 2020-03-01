@@ -37,6 +37,8 @@ namespace assetLoader
 	// typeid 0 is always the type of the assetfile defined in asset_settings
 	void AddAssetType(asset_type NewType);
 	asset_type& GetAssetTypeFromID(s32 TypeID);
+	u32 AssetTypeArraySize();
+	asset_type* GetAssetTypeArray();
 
 	// Returns id of filetype (if supported) from any filename, otherwise returns -1
 	s32 GetFileTypeID(char* Filename);

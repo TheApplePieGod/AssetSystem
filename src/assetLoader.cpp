@@ -33,6 +33,16 @@ asset_type& assetLoader::GetAssetTypeFromID(s32 TypeID)
 	throw std::out_of_range("TypeID does not exist");
 }
 
+u32 assetLoader::AssetTypeArraySize()
+{
+	return (u32)AssetTypes.size();
+}
+
+asset_type* assetLoader::GetAssetTypeArray()
+{
+	return AssetTypes.data();
+}
+
 void SetAssetFieldsFromHeader(cAsset& Asset, asset_header& Header, std::string Path)
 {
 	Asset.AssetID = Header.ID;
