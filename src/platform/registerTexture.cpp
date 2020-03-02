@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "../assetLoader.h"
-#include "../assets/defaultAssetTypes.h"
+#include "../assets/assetTypes.h"
 
-using namespace defaultAssetTypes;
+using namespace assetTypes;
 
 #ifdef ASSET_DIRECTX11
 // assumes asset type 1 is image and 2 is font

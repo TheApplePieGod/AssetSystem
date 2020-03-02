@@ -1,13 +1,13 @@
 #include "pch.h"
 #include "../assetLoader.h"
-#include "defaultAssetTypes.h"
+#include "assetTypes.h"
 
 #include "pch.h"
 #include "../assetLoader.h"
-#include "defaultAssetTypes.h"
+#include "assetTypes.h"
 
 // multithreading not supported
-//void GetPolygonData(u32 StartingPolygon, u32 EndingPolygon, u32 DirectArrayIndex, std::vector<defaultAssetTypes::vertex>* LocalVertexArray, FbxMesh* pMesh)
+//void GetPolygonData(u32 StartingPolygon, u32 EndingPolygon, u32 DirectArrayIndex, std::vector<assetTypes::vertex>* LocalVertexArray, FbxMesh* pMesh)
 //{
 //	u32 ArrayIndex = 0;
 //	FbxVector4* lControlPoints = pMesh->GetControlPoints();
@@ -19,14 +19,14 @@
 //
 //		for (u32 k = 0; k < NumVertices; k++)
 //		{
-//			defaultAssetTypes::vertex vert = defaultAssetTypes::vertex();
+//			assetTypes::vertex vert = assetTypes::vertex();
 //			LocalVertexArray->push_back(vert);
 //
 //			//vertices data
 //			u32 ControlPointIndex = pMesh->GetPolygonVertex(j, k);
 //			FbxVector4 Vertex = lControlPoints[ControlPointIndex];
 //
-//			LocalVertexArray->at(ArrayIndex).position = defaultAssetTypes::v3{ (float)Vertex[0], (float)Vertex[1], (float)Vertex[2] };
+//			LocalVertexArray->at(ArrayIndex).position = assetTypes::v3{ (float)Vertex[0], (float)Vertex[1], (float)Vertex[2] };
 //
 //			//UV data
 //			u32 ElementUVCount = pMesh->GetElementUVCount();
@@ -81,7 +81,7 @@
 //				{ }	break;
 //				}
 //
-//				LocalVertexArray->at(ArrayIndex).uv = defaultAssetTypes::v2{ (float)UV[0], (float)UV[1] };
+//				LocalVertexArray->at(ArrayIndex).uv = assetTypes::v2{ (float)UV[0], (float)UV[1] };
 //			}
 //
 //			// normal data
@@ -116,7 +116,7 @@
 //				}
 //
 //				// storing normals as float3s
-//				LocalVertexArray->at(ArrayIndex).normal = defaultAssetTypes::v3{ (float)Normal[0], (float)Normal[1], (float)Normal[2] };
+//				LocalVertexArray->at(ArrayIndex).normal = assetTypes::v3{ (float)Normal[0], (float)Normal[1], (float)Normal[2] };
 //			}
 //
 //			// tangent data
@@ -161,7 +161,7 @@
 //	}
 //}
 //
-//bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
+//bool assetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
 //{
 //	// Initialize the SDK manager. This object handles memory management.
 //	FbxManager* lSdkManager = FbxManager::Create();
@@ -200,7 +200,7 @@
 //	FbxNode* pFbxRootNode = lScene->GetRootNode();
 //	if (pFbxRootNode)
 //	{
-//		std::vector<defaultAssetTypes::vertex> VertexArray;
+//		std::vector<assetTypes::vertex> VertexArray;
 //
 //		int NumThreads = std::thread::hardware_concurrency();
 //		if (NumThreads == 0)
@@ -227,10 +227,10 @@
 //			u32 Extra = TotalPolygons - (PolygonsPerThread * NumThreads);
 //
 //			std::vector<std::thread> threads(NumThreads);
-//			std::vector<std::vector<defaultAssetTypes::vertex>> LocalVertexArrays;
+//			std::vector<std::vector<assetTypes::vertex>> LocalVertexArrays;
 //			for (int i = 0; i < NumThreads; i++)
 //			{
-//				std::vector<defaultAssetTypes::vertex> LocalVertArray;
+//				std::vector<assetTypes::vertex> LocalVertArray;
 //				LocalVertexArrays.push_back(LocalVertArray);
 //				threads[i] = std::thread(GetPolygonData, CurrentPolygon, CurrentPolygon + PolygonsPerThread + (i == NumThreads - 1 ? Extra : 0), DirectArrayIndex, &LocalVertexArrays[i], pMesh);
 //				DirectArrayIndex += PolygonsPerThread * 3; // triangles
@@ -240,9 +240,9 @@
 //			for (auto& th : threads)
 //				th.join();
 //
-//			for (std::vector<defaultAssetTypes::vertex>& VertArray : LocalVertexArrays)
+//			for (std::vector<assetTypes::vertex>& VertArray : LocalVertexArrays)
 //			{
-//				for (defaultAssetTypes::vertex Vert : VertArray)
+//				for (assetTypes::vertex Vert : VertArray)
 //				{
 //					VertexArray.push_back(Vert);
 //				}
@@ -251,29 +251,29 @@
 //
 //		for (u32 i = 0; i < (u32)VertexArray.size(); i += 3) // calculate tangents
 //		{
-//			defaultAssetTypes::vertex& v0 = VertexArray[i];
-//			defaultAssetTypes::vertex& v1 = VertexArray[i + 1];
-//			defaultAssetTypes::vertex& v2 = VertexArray[i + 2];
+//			assetTypes::vertex& v0 = VertexArray[i];
+//			assetTypes::vertex& v1 = VertexArray[i + 1];
+//			assetTypes::vertex& v2 = VertexArray[i + 2];
 //
-//			defaultAssetTypes::v3 pos0 = v0.position;
-//			defaultAssetTypes::v3 pos1 = v1.position;
-//			defaultAssetTypes::v3 pos2 = v2.position;
+//			assetTypes::v3 pos0 = v0.position;
+//			assetTypes::v3 pos1 = v1.position;
+//			assetTypes::v3 pos2 = v2.position;
 //
-//			defaultAssetTypes::v2 uv0 = v0.uv;
-//			defaultAssetTypes::v2 uv1 = v1.uv;
-//			defaultAssetTypes::v2 uv2 = v2.uv;
+//			assetTypes::v2 uv0 = v0.uv;
+//			assetTypes::v2 uv1 = v1.uv;
+//			assetTypes::v2 uv2 = v2.uv;
 //
 //			// Position delta
-//			defaultAssetTypes::v3 deltaPos1 = pos1 - pos0;
-//			defaultAssetTypes::v3 deltaPos2 = pos2 - pos0;
+//			assetTypes::v3 deltaPos1 = pos1 - pos0;
+//			assetTypes::v3 deltaPos2 = pos2 - pos0;
 //
 //			// UV delta
-//			defaultAssetTypes::v2 deltaUV1 = uv1 - uv0;
-//			defaultAssetTypes::v2 deltaUV2 = uv2 - uv0;
+//			assetTypes::v2 deltaUV1 = uv1 - uv0;
+//			assetTypes::v2 deltaUV2 = uv2 - uv0;
 //
 //			float r = 1.0f / (deltaUV1.u * deltaUV2.v - deltaUV1.v * deltaUV2.u);
-//			defaultAssetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
-//			defaultAssetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
+//			assetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
+//			assetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
 //
 //			v0.tangent = tangent;
 //			v1.tangent = tangent;
@@ -287,7 +287,7 @@
 //		mesh_data MeshData;
 //		MeshData.NumVertices = (u32)VertexArray.size();
 //
-//		u32 DataLength = MeshData.NumVertices * sizeof(defaultAssetTypes::vertex);
+//		u32 DataLength = MeshData.NumVertices * sizeof(assetTypes::vertex);
 //		u32 ExtraSize = sizeof(MeshData);
 //
 //		// Set fields
@@ -304,7 +304,7 @@
 //		return false;
 //}
 
-bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
+bool assetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
 {
 	// Initialize the SDK manager. This object handles memory management.
 	FbxManager* lSdkManager = FbxManager::Create();
@@ -343,7 +343,7 @@ bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_
 	FbxNode* pFbxRootNode = lScene->GetRootNode();
 	if (pFbxRootNode)
 	{
-		std::vector<defaultAssetTypes::vertex> VertexArray;
+		std::vector<assetTypes::vertex> VertexArray;
 		u32 ArrayIndex = 0;
 		for (int i = 0; i < pFbxRootNode->GetChildCount(); i++)
 		{
@@ -371,7 +371,7 @@ bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_
 				for (u32 k = 0; k < NumVertices; k++)
 					//for (s32 k = NumVertices - 1; k >= 0; k--)
 				{
-					defaultAssetTypes::vertex vert = defaultAssetTypes::vertex();
+					assetTypes::vertex vert = assetTypes::vertex();
 					VertexArray.push_back(vert);
 
 					//vertices data
@@ -515,29 +515,29 @@ bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_
 
 		for (u32 i = 0; i < (u32)VertexArray.size(); i += 3) // calculate tangents
 		{
-			defaultAssetTypes::vertex& v0 = VertexArray[i];
-			defaultAssetTypes::vertex& v1 = VertexArray[i + 1];
-			defaultAssetTypes::vertex& v2 = VertexArray[i + 2];
+			assetTypes::vertex& v0 = VertexArray[i];
+			assetTypes::vertex& v1 = VertexArray[i + 1];
+			assetTypes::vertex& v2 = VertexArray[i + 2];
 
-			defaultAssetTypes::v3 pos0 = v0.position;
-			defaultAssetTypes::v3 pos1 = v1.position;
-			defaultAssetTypes::v3 pos2 = v2.position;
+			assetTypes::v3 pos0 = v0.position;
+			assetTypes::v3 pos1 = v1.position;
+			assetTypes::v3 pos2 = v2.position;
 
-			defaultAssetTypes::v2 uv0 = v0.uv;
-			defaultAssetTypes::v2 uv1 = v1.uv;
-			defaultAssetTypes::v2 uv2 = v2.uv;
+			assetTypes::v2 uv0 = v0.uv;
+			assetTypes::v2 uv1 = v1.uv;
+			assetTypes::v2 uv2 = v2.uv;
 
 			// Position delta
-			defaultAssetTypes::v3 deltaPos1 = pos1 - pos0;
-			defaultAssetTypes::v3 deltaPos2 = pos2 - pos0;
+			assetTypes::v3 deltaPos1 = pos1 - pos0;
+			assetTypes::v3 deltaPos2 = pos2 - pos0;
 
 			// UV delta
-			defaultAssetTypes::v2 deltaUV1 = uv1 - uv0;
-			defaultAssetTypes::v2 deltaUV2 = uv2 - uv0;
+			assetTypes::v2 deltaUV1 = uv1 - uv0;
+			assetTypes::v2 deltaUV2 = uv2 - uv0;
 
 			float r = 1.0f / (deltaUV1.u * deltaUV2.v - deltaUV1.v * deltaUV2.u);
-			defaultAssetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
-			defaultAssetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
+			assetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
+			assetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
 
 			v0.tangent = tangent;
 			v1.tangent = tangent;
@@ -551,7 +551,7 @@ bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_
 		mesh_data MeshData;
 		MeshData.NumVertices = (u32)VertexArray.size();
 
-		u32 DataLength = MeshData.NumVertices * sizeof(defaultAssetTypes::vertex);
+		u32 DataLength = MeshData.NumVertices * sizeof(assetTypes::vertex);
 		u32 ExtraSize = sizeof(MeshData);
 
 		// Set fields
@@ -568,7 +568,7 @@ bool defaultAssetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_
 		return false;
 }
 
-cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
+cAsset* assetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
 {
 	mesh_data MeshData = *((mesh_data*)ExtraData);
 	cMeshAsset* MeshAsset = new cMeshAsset();
@@ -576,7 +576,7 @@ cAsset* defaultAssetTypes::Mesh_InitializeData(cAsset* AssetDefaults, char* Extr
 
 	MeshAsset->MeshData = MeshData;
 
-	MeshAsset->LoadAssetData();
+	//MeshAsset->LoadAssetData();
 
 	return MeshAsset;
 }

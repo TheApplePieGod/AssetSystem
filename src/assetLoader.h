@@ -17,14 +17,15 @@ namespace assetLoader
 	// Pack file is assumed to be in the exe directory
 	void InitializeAssetsFromPack();
 
+	bool LoadAllFileData(const char* Filepath, void*& Out_Data, u32& Out_FileSize);
+
 	/*
 	* Dynamically convert file into asset format on drive; returns new full path of the converted file
 	* Path is full path of the file
-	* AssetID MUST be unique from other assets
 	* Does not generate/modify pack file; it must be recreated
-	* Returned path is newed, must be deleted after use
+	* Returned path is newed, must be deleted after use (todo: change)
 	*/
-	//const char* PackImage(const char* Path, int AssetID); // todo: PackAsset
+	const char* PackAsset(const char* Path);
 
 	/*
 	* Individually load assets from disk
@@ -32,7 +33,7 @@ namespace assetLoader
 	* only supported in debug mode
 	* (useful for dragging/dropping new assets)
 	*/
-	//void LoadImage(const char* Path, void (*Callback)(cTextureAsset*)); // todo: LoadAsset
+	cAsset* InitializeAsset(const char* Path);
 
 	// typeid 0 is always the type of the assetfile defined in asset_settings
 	void AddAssetType(asset_type NewType);
@@ -41,7 +42,7 @@ namespace assetLoader
 	asset_type* GetAssetTypeArray();
 
 	// Returns id of filetype (if supported) from any filename, otherwise returns -1
-	s32 GetFileTypeID(char* Filename);
+	s32 GetFileTypeID(const char* Filename);
 
 	// Exports loaded asset to exe directory (todo)
 	//void ExportAsset(cAsset* Asset);

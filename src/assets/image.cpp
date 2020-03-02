@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "../assetLoader.h"
-#include "defaultAssetTypes.h"
+#include "assetTypes.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -10,7 +10,7 @@
 #include "../lib/stb_image_write.h"
 #include "../lib/stb_truetype.h"
 
-bool defaultAssetTypes::Image_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
+bool assetTypes::Image_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath)
 {
 	image_data ImageData;
 	unsigned char* PixelData = stbi_load(FilePath, &ImageData.Width, &ImageData.Height, &ImageData.Channels, 4); // load the png
@@ -33,7 +33,7 @@ bool defaultAssetTypes::Image_GetDataForWriting(char*& Out_ExtraData, char*& Out
 	return true;
 }
 
-cAsset* defaultAssetTypes::Image_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
+cAsset* assetTypes::Image_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize)
 {
 	image_data ImageData = *((image_data*)ExtraData);
 	cTextureAsset* TexAsset = new cTextureAsset();
@@ -41,7 +41,7 @@ cAsset* defaultAssetTypes::Image_InitializeData(cAsset* AssetDefaults, char* Ext
 
 	TexAsset->ImageData = ImageData;
 
-	TexAsset->LoadAssetData();
+	//TexAsset->LoadAssetData();
 
 	return TexAsset;
 }

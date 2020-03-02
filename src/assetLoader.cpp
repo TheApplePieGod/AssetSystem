@@ -52,7 +52,7 @@ void SetAssetFieldsFromHeader(cAsset& Asset, asset_header& Header, std::string P
 	strncpy(Asset.Path, Path.c_str(), MAX_PATH);
 }
 
-std::string GetLowercaseFileExtension(char* Filename)
+std::string GetLowercaseFileExtension(const char* Filename)
 {
 	std::locale loc;
 	int Length = (int)strlen(Filename);
@@ -68,7 +68,7 @@ std::string GetLowercaseFileExtension(char* Filename)
 	return Checking;
 }
 
-s32 assetLoader::GetFileTypeID(char* Filename)
+s32 assetLoader::GetFileTypeID(const char* Filename)
 {
 	std::string Checking = GetLowercaseFileExtension(Filename);
 
@@ -92,16 +92,25 @@ s32 assetLoader::GetFileTypeID(char* Filename)
 	return -1;
 }
 
-// windows
-char* LoadAllFileData(WIN32_FIND_DATA Data, const char* Path)
+bool assetLoader::LoadAllFileData(const char* Filepath, void*& Out_Data, u32& Out_FileSize)
 {
-	u32 filesize = (Data.nFileSizeHigh * ((long)MAXDWORD + 1)) + Data.nFileSizeLow;
-	std::ifstream ifs(Path, std::ifstream::binary);
-	char* FileBuffer = new char[filesize];
-	ifs.rdbuf()->sgetn(FileBuffer, filesize);
-	ifs.close();
+	try
+	{
+		std::ifstream t(Filepath, std::ifstream::binary | std::ifstream::in);
+		t.seekg(0, std::ios::end);
+		Out_FileSize = (u32)t.tellg();
+		t.seekg(0, std::ios::beg);
 
-	return FileBuffer;
+		Out_Data = new char[Out_FileSize];
+
+		t.read((char*)Out_Data, Out_FileSize);
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		e;
+		return false;
+	}
 }
 
 std::string RemoveFileAndGetNewPath(std::string Path)
@@ -131,6 +140,93 @@ bool CompareFiles(WIN32_FIND_DATA& f1, WIN32_FIND_DATA& f2)
 		return false;
 	else
 		return true;
+}
+
+std::string InternalPackAsset(std::string FullPath, WIN32_FIND_DATA File, bool GeneratePac, int* ID, std::ofstream* ofs)
+{
+	std::string NewPath = "";
+	s32 TypeID = assetLoader::GetFileTypeID(File.cFileName);
+	if (TypeID != -1)
+	{
+		if (TypeID != 0) // 0 = type of asset file
+		{
+			asset_type& AssetType = assetLoader::GetAssetTypeFromID(TypeID);
+			char* ExtraData = nullptr;
+			char* RawData = nullptr;
+			u32 ExtraDataSize = 0;
+			u32 RawDataSize = 0;
+			bool DeleteData = (*AssetType.GetDataForWriting)(ExtraData, RawData, ExtraDataSize, RawDataSize, (char*)FullPath.c_str());
+
+			if (ExtraDataSize + RawDataSize > 0)
+			{
+				NewPath = RemoveFileAndGetNewPath(FullPath);
+
+				asset_header Header;
+				if (ID != nullptr)
+				{
+					(*ID)++;
+					Header.ID = *ID;
+				}
+				else
+					Header.ID = -1; // only for debug ????? still not sure
+
+				Header.Type = TypeID;
+				Header.FormatVersion = GetAssetSettings().FormatVersion;
+				Header.ExtraDataSize = ExtraDataSize;
+				Header.RawDataSize = RawDataSize;
+				strcpy(Header.Filename, File.cFileName);
+
+				FILE* File;
+				File = fopen(NewPath.c_str(), "wb");
+				if (File)
+				{
+					fwrite((char*)&Header, sizeof(Header), 1, File);
+					fwrite(ExtraData, sizeof(char), ExtraDataSize, File);
+					fwrite(RawData, sizeof(char), RawDataSize, File);
+					fclose(File);
+				}
+
+				if (GeneratePac)
+				{
+					ofs->write((char*)&Header, sizeof(Header));
+					ofs->write(ExtraData, ExtraDataSize);
+					ofs->write(RawData, RawDataSize);
+				}
+			}
+
+			if (DeleteData)
+			{
+				if (ExtraData != nullptr)
+					delete[] ExtraData;
+				if (RawData != nullptr)
+					delete[] RawData;
+			}
+		}
+		else if (GeneratePac) // copy file data into pac
+		{
+			u32 filesize = (File.nFileSizeHigh * ((long)MAXDWORD + 1)) + File.nFileSizeLow;
+			std::ifstream ifs(FullPath.c_str(), std::ifstream::binary);
+			char* FileBuffer = new char[filesize];
+			ifs.rdbuf()->sgetn(FileBuffer, filesize);
+			ofs->write(FileBuffer, filesize);
+			delete[] FileBuffer;
+		}
+	}
+
+	return NewPath.c_str();
+}
+
+const char* assetLoader::PackAsset(const char* Path)
+{
+	WIN32_FIND_DATA data;
+	HANDLE hFind = FindFirstFile(Path, &data);
+
+	std::string NewPath = InternalPackAsset(Path, data, false, nullptr, nullptr);
+
+	char* retptr = new char[NewPath.size() + 1];
+	strcpy(retptr, NewPath.c_str());
+
+	return retptr;
 }
 
 void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool GeneratePac, int* ID, bool ScanNestedDirectories)
@@ -165,69 +261,8 @@ void IterateOverDirectory(const char* DirectoryPath, std::ofstream* ofs, bool Ge
 
 	for (u32 i = 0; i < FoundFiles.size(); i++)
 	{
-		std::string Filename = FoundFiles[i].cFileName;
-
-		s32 TypeID = assetLoader::GetFileTypeID(FoundFiles[i].cFileName);
-		if (TypeID != -1)
-		{
-			std::string FullPath = (Path + FoundFiles[i].cFileName);
-
-			if (TypeID != 0) // 0 = type of asset file
-			{
-				asset_type& AssetType = assetLoader::GetAssetTypeFromID(TypeID);
-				char* ExtraData = nullptr;
-				char* RawData = nullptr;
-				u32 ExtraDataSize = 0;
-				u32 RawDataSize = 0;
-				bool DeleteData = (*AssetType.GetDataForWriting)(ExtraData, RawData, ExtraDataSize, RawDataSize, (char*)FullPath.c_str());
-
-				if (ExtraDataSize + RawDataSize > 0)
-				{
-					std::string NewPath = RemoveFileAndGetNewPath(FullPath);
-
-					(*ID)++;
-					asset_header Header;
-					Header.ID = *ID;
-					Header.Type = TypeID;
-					Header.FormatVersion = GetAssetSettings().FormatVersion;
-					Header.ExtraDataSize = ExtraDataSize;
-					Header.RawDataSize = RawDataSize;
-					strcpy(Header.Filename, FoundFiles[i].cFileName);
-
-					FILE* File;
-					File = fopen(NewPath.c_str(), "wb");
-					if (File)
-					{
-						fwrite((char*)&Header, sizeof(Header), 1, File);
-						fwrite(ExtraData, sizeof(char), ExtraDataSize, File);
-						fwrite(RawData, sizeof(char), RawDataSize, File);
-						fclose(File);
-					}
-
-					if (GeneratePac)
-					{
-						ofs->write((char*)&Header, sizeof(Header));
-						ofs->write(ExtraData, ExtraDataSize);
-						ofs->write(RawData, RawDataSize);
-					}
-				}
-
-				if (DeleteData)
-				{
-					delete[] ExtraData;
-					delete[] RawData;
-				}
-			}
-			else if (GeneratePac) // copy file data into pac
-			{
-				u32 filesize = (FoundFiles[i].nFileSizeHigh * ((long)MAXDWORD + 1)) + FoundFiles[i].nFileSizeLow;
-				std::ifstream ifs(FullPath.c_str(), std::ifstream::binary);
-				char* FileBuffer = new char[filesize];
-				ifs.rdbuf()->sgetn(FileBuffer, filesize);
-				ofs->write(FileBuffer, filesize);
-				delete[] FileBuffer;
-			}
-		}
+		std::string FullPath = (Path + FoundFiles[i].cFileName);
+		InternalPackAsset(FullPath, FoundFiles[i], GeneratePac, ID, ofs);
 	}
 }
 
@@ -249,19 +284,29 @@ void assetLoader::ScanAssets(const char* DirectoryPath, bool GeneratePac, bool S
 }
 
 // File pos must be directly after header
-void InitializeNewAsset(asset_header& Header, std::string Path, FILE* File)
+cAsset* InitializeNewAsset(asset_header& Header, std::string Path, FILE* File)
 {
 	asset_type& AssetType = assetLoader::GetAssetTypeFromID(Header.Type);
 
-	char* ExtraData = new char[Header.ExtraDataSize];
+	char* ExtraData = nullptr;
+	if (Header.ExtraDataSize > 0)
+	{
+		ExtraData = new char[Header.ExtraDataSize];
+		fread(ExtraData, sizeof(char), Header.ExtraDataSize, File);
+	}
+
 	cAsset Asset;
 	SetAssetFieldsFromHeader(Asset, Header, Path);
 
-	fread(ExtraData, sizeof(char), Header.ExtraDataSize, File);
-
 	cAsset* LoadedAsset = (*AssetType.InitializeData)(&Asset, ExtraData, Header.ExtraDataSize);
 	(*AssetType.LoadCallback)(LoadedAsset);
-	delete[] ExtraData;
+
+	if (ExtraData != nullptr)
+		delete[] ExtraData;
+
+	fclose(File);
+
+	return LoadedAsset;
 }
 
 void assetLoader::InitializeAssetsFromPack() // assets should never change, so new is OK (later add int array of ids to load)
@@ -294,6 +339,23 @@ void assetLoader::InitializeAssetsFromPack() // assets should never change, so n
 				fseek(pak, (Header.ExtraDataSize + Header.RawDataSize), SEEK_CUR);
 		}
 	}
+}
+
+cAsset* assetLoader::InitializeAsset(const char* Path)
+{
+	FILE* File = fopen(Path, "rb");
+	if (File)
+	{
+		asset_header Header;
+		fread((char*)&Header, 1, sizeof(asset_header), File);
+
+		if (Header.Type != -1 && Header.FormatVersion == GetAssetSettings().FormatVersion)
+		{
+			return InitializeNewAsset(Header, Path, File);
+		}
+	}
+
+	return nullptr;
 }
 
 void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, bool ScanNestedDirectories)
@@ -333,19 +395,8 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, bool Sc
 
 	for (u32 i = 0; i < FoundFiles.size(); i++)
 	{
-		FILE* File = fopen((Path + FoundFiles[i].cFileName).c_str(), "rb");
-		if (File)
-		{
-			asset_header Header;
-			fread((char*)&Header, 1, sizeof(asset_header), File);
-			std::string FullPath = Path + FoundFiles[i].cFileName;
-
-			if (Header.Type != -1 && Header.FormatVersion == GetAssetSettings().FormatVersion)
-			{
-				InitializeNewAsset(Header, FullPath, File);
-			}
-			fclose(File);
-		}
+		std::string FullPath = (Path + FoundFiles[i].cFileName);
+		InitializeAsset(FullPath.c_str());
 	}
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace defaultAssetTypes
+namespace assetTypes
 {
 	// image
 	struct image_data
@@ -11,7 +11,7 @@ namespace defaultAssetTypes
 	};
 
 	bool Image_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath);
-	cAsset* Image_InitializeData(cAsset* AssetDefaults, char* Data, u32 DataSize);
+	cAsset* Image_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize);
 
 	static asset_type ImageType = { 1, "Image", {"png", "jpg", "tga"}, Image_GetDataForWriting, Image_InitializeData }; // Set callback separately
 
@@ -118,7 +118,7 @@ namespace defaultAssetTypes
 	}
 
 	bool Font_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath);
-	cAsset* Font_InitializeData(cAsset* AssetDefaults, char* Data, u32 DataSize);
+	cAsset* Font_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize);
 
 	static asset_type FontType = { 2, "Font", {"ttf"}, Font_GetDataForWriting, Font_InitializeData }; // Set callback separately
 
@@ -148,14 +148,14 @@ namespace defaultAssetTypes
 	};
 
 	bool Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath);
-	cAsset* Mesh_InitializeData(cAsset* AssetDefaults, char* Data, u32 DataSize);
+	cAsset* Mesh_InitializeData(cAsset* AssetDefaults, char* ExtraData, u32 ExtraDataSize);
 
 	static asset_type MeshType = { 3, "Mesh", {"fbx"}, Mesh_GetDataForWriting, Mesh_InitializeData }; // Set callback separately
 };
 
 struct cTextureAsset : public cAsset // todo: change to cImageAsset
 {
-	defaultAssetTypes::image_data ImageData;
+	assetTypes::image_data ImageData;
 
 #ifdef ASSET_DIRECTX11
 	ID3D11Texture2D* TextureHandle = nullptr;
@@ -168,7 +168,7 @@ struct cTextureAsset : public cAsset // todo: change to cImageAsset
 
 struct cFontAsset : public cAsset
 {
-	defaultAssetTypes::font_data FontData;
+	assetTypes::font_data FontData;
 
 #ifdef ASSET_DIRECTX11
 	ID3D11ShaderResourceView* AtlasShaderHandle = nullptr;
@@ -176,24 +176,24 @@ struct cFontAsset : public cAsset
 
 	u32 NumChars;
 	u32 NumKernVals;
-	defaultAssetTypes::char_entry* Characters;
-	defaultAssetTypes::kern_entry* KernValues;
+	assetTypes::char_entry* Characters;
+	assetTypes::kern_entry* KernValues;
 
 	// Register atlas tex with rendering sdk by calling assetLoader::Register(your_sdk)Texture
 	void UnloadAsset() override;
 
-	inline defaultAssetTypes::char_entry FindCharEntryByAscii(u32 AsciiVal)
+	inline assetTypes::char_entry FindCharEntryByAscii(u32 AsciiVal)
 	{
 		for (u32 i = 0; i < NumChars; i++)
 		{
 			if (Characters[i].AsciiValue == AsciiVal)
 				return Characters[i];
 		}
-		return defaultAssetTypes::char_entry();
+		return assetTypes::char_entry();
 	}
 };
 
 struct cMeshAsset : public cAsset
 {
-	defaultAssetTypes::mesh_data MeshData;
+	assetTypes::mesh_data MeshData;
 };

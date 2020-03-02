@@ -1,13 +1,13 @@
 #include "pch.h"
 #include "asset.h"
-#include "assets/defaultAssetTypes.h"
+#include "assets/assetTypes.h"
 
 #pragma warning( push )
 #pragma warning( disable : 6387)
 #pragma warning( disable : 6386)
 #pragma warning( disable : 26444)
 
-using namespace defaultAssetTypes;
+using namespace assetTypes;
 
 asset_settings AssetSettings;
 std::vector<asset_type> AssetTypes;

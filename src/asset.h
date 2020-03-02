@@ -50,7 +50,7 @@ void SetAssetSettings(asset_settings Settings);
 
 struct cAsset
 {
-	s32 AssetID; 	// internal use
+	s32 AssetID; 	// DEPRECATED (todo: move out of asset.h, keep in header for pac use)
 	b32 Active = true;
 	bool Loaded = false;
 	s32 Type;
