@@ -44,6 +44,13 @@ namespace assetLoader
 	// Returns id of filetype (if supported) from any filename, otherwise returns -1
 	s32 GetFileTypeID(const char* Filename);
 
+	/*
+	* Rename loaded asset & on disk
+	* Only works in debug mode
+	* file extensions are appended internally
+	*/
+	void RenameAsset(cAsset* Asset, const char* NewFilename);
+
 	// Exports loaded asset to exe directory (todo)
 	//void ExportAsset(cAsset* Asset);
 

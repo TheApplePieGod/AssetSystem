@@ -104,6 +104,7 @@ bool assetLoader::LoadAllFileData(const char* Filepath, void*& Out_Data, u32& Ou
 		Out_Data = new char[Out_FileSize];
 
 		t.read((char*)Out_Data, Out_FileSize);
+		t.close();
 		return true;
 	}
 	catch (const std::exception& e)
@@ -398,6 +399,44 @@ void assetLoader::InitializeAssetsInDirectory(const char* DirectoryPath, bool Sc
 		std::string FullPath = (Path + FoundFiles[i].cFileName);
 		InitializeAsset(FullPath.c_str());
 	}
+}
+
+void assetLoader::RenameAsset(cAsset* Asset, const char* NewFilename)
+{
+	std::string NFN = NewFilename;
+	NFN += ".";
+	std::string EAFFilename = NFN + GetAssetSettings().AssetFileExtension;
+	std::string OGFilename = NFN + GetLowercaseFileExtension(Asset->Filename);
+
+	std::string NewPath = Asset->Path;
+	NewPath = NewPath.substr(0, NewPath.size() - strlen(Asset->Filename));
+	NewPath += EAFFilename;
+
+	std::ifstream t(Asset->Path, std::ifstream::binary | std::ifstream::in);
+	t.seekg(0, std::ios::end);
+	u32 Filesize = (u32)t.tellg();
+	t.seekg(0, std::ios::beg);
+
+	asset_header Header;
+	u32 DataSize = Filesize - sizeof(asset_header);
+	char* Data = new char[DataSize];
+	t.read((char*)&Header, sizeof(asset_header));
+	t.read(Data, DataSize);
+	t.close();
+
+	strcpy(Header.Filename, OGFilename.c_str());
+
+	FILE* File = fopen(NewPath.c_str(), "wb");
+	if (File)
+	{
+		fwrite(&Header, sizeof(asset_header), 1, File);
+		fwrite(Data, sizeof(char), DataSize, File);
+		fclose(File);
+		remove(Asset->Path);
+	}
+
+	strcpy(Asset->Filename, OGFilename.c_str());
+	strcpy(Asset->Path, NewPath.c_str());
 }
 
 /*

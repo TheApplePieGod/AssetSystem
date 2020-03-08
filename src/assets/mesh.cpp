@@ -548,19 +548,38 @@ bool assetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData
 			v2.bitangent = bitangent;
 		}
 
-		mesh_data MeshData;
-		MeshData.NumVertices = (u32)VertexArray.size();
+		std::vector<u32> Indices;
+		std::map<std::string, u32> IndexVertexMap;
+		std::vector<assetTypes::vertex> FinalVertices;
+		u32 CurrentIndex = 0;
+		for (u32 i = 0; i < (u32)VertexArray.size(); i++)
+		{
+			if (IndexVertexMap.count((char*)&VertexArray[i]) == 0)
+			{
+				IndexVertexMap[(char*)&VertexArray[i]] = CurrentIndex;
+				Indices.push_back(CurrentIndex++);
+				FinalVertices.push_back(VertexArray[i]);
+			}
+			else
+				Indices.push_back(IndexVertexMap[(char*)&VertexArray[i]]);
+		}
 
-		u32 DataLength = MeshData.NumVertices * sizeof(assetTypes::vertex);
+		mesh_data MeshData;
+		MeshData.NumVertices = (u32)FinalVertices.size();
+		MeshData.NumIndices = (u32)Indices.size();
+
+		u32 VertDataLength = MeshData.NumVertices * sizeof(assetTypes::vertex);
+		u32 IndexDataLength = MeshData.NumIndices * sizeof(u32);
 		u32 ExtraSize = sizeof(MeshData);
 
 		// Set fields
 		Out_ExtraData = new char[ExtraSize];
 		memcpy(Out_ExtraData, &MeshData, ExtraSize);
-		Out_RawData = new char[DataLength]; // Allocate new array since std::vector auto deletes data
-		memcpy(Out_RawData, (char*)VertexArray.data(), DataLength);
+		Out_RawData = new char[VertDataLength + IndexDataLength]; // Allocate new array since std::vector auto deletes data
+		memcpy(Out_RawData, (char*)FinalVertices.data(), VertDataLength);
+		memcpy(Out_RawData + VertDataLength, (char*)Indices.data(), IndexDataLength);
 		Out_ExtraDataSize = ExtraSize;
-		Out_RawDataSize = DataLength;
+		Out_RawDataSize = VertDataLength + IndexDataLength;
 		
 		return true;
 	}

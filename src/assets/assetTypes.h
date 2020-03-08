@@ -145,6 +145,7 @@ namespace assetTypes
 	struct mesh_data
 	{
 		u32 NumVertices;
+		u32 NumIndices;
 	};
 
 	bool Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData, u32& Out_ExtraDataSize, u32& Out_RawDataSize, char* FilePath);

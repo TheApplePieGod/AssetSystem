@@ -16,5 +16,6 @@
 #include <shlwapi.h>
 #include <locale>
 #include <thread>
+#include <map>
 
 #define ASSET_DIRECTX11
