@@ -205,10 +205,14 @@ std::string InternalPackAsset(std::string FullPath, WIN32_FIND_DATA File, bool G
 		}
 		else if (GeneratePac) // copy file data into pac
 		{
+			if (ID != nullptr)
+				(*ID)++;
+
 			u32 filesize = (File.nFileSizeHigh * ((long)MAXDWORD + 1)) + File.nFileSizeLow;
 			std::ifstream ifs(FullPath.c_str(), std::ifstream::binary);
 			char* FileBuffer = new char[filesize];
 			ifs.rdbuf()->sgetn(FileBuffer, filesize);
+			((asset_header*)FileBuffer)->ID = *ID;
 			ofs->write(FileBuffer, filesize);
 			delete[] FileBuffer;
 		}
@@ -305,8 +309,6 @@ cAsset* InitializeNewAsset(asset_header& Header, std::string Path, FILE* File)
 	if (ExtraData != nullptr)
 		delete[] ExtraData;
 
-	fclose(File);
-
 	return LoadedAsset;
 }
 
@@ -335,6 +337,7 @@ void assetLoader::InitializeAssetsFromPack() // assets should never change, so n
 				std::string PositionInPack = Buffer;
 
 				InitializeNewAsset(Header, PositionInPack, pak);
+				fseek(pak, Header.RawDataSize, SEEK_CUR);
 			}
 			else
 				fseek(pak, (Header.ExtraDataSize + Header.RawDataSize), SEEK_CUR);
@@ -352,7 +355,9 @@ cAsset* assetLoader::InitializeAsset(const char* Path)
 
 		if (Header.Type != -1 && Header.FormatVersion == GetAssetSettings().FormatVersion)
 		{
-			return InitializeNewAsset(Header, Path, File);
+			cAsset* returned = InitializeNewAsset(Header, Path, File);
+			fclose(File);
+			return returned;
 		}
 	}
 

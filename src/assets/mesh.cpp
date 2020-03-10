@@ -539,6 +539,20 @@ bool assetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData
 			assetTypes::v3 tangent = (deltaPos1 * deltaUV2.v - deltaPos2 * deltaUV1.v) * r;
 			assetTypes::v3 bitangent = (deltaPos2 * deltaUV1.u - deltaPos1 * deltaUV2.u) * r;
 
+			//assetTypes::v3 normal;
+			//normal.x = (deltaPos1.y * deltaPos2.z) - (deltaPos1.z * deltaPos2.y);
+			//normal.y = (deltaPos1.z * deltaPos2.x) - (deltaPos1.x * deltaPos2.z);
+			//normal.z = (deltaPos1.x * deltaPos2.y) - (deltaPos1.y * deltaPos2.x);
+
+			//float length = (float)sqrt((normal.x * normal.x) + (normal.y * normal.y) + (normal.z * normal.z));
+			//normal.x /= length;
+			//normal.y /= length;
+			//normal.z /= length;
+
+			//v0.normal = normal;
+			//v1.normal = normal;
+			//v2.normal = normal;
+
 			v0.tangent = tangent;
 			v1.tangent = tangent;
 			v2.tangent = tangent;
@@ -551,17 +565,33 @@ bool assetTypes::Mesh_GetDataForWriting(char*& Out_ExtraData, char*& Out_RawData
 		std::vector<u32> Indices;
 		std::map<std::string, u32> IndexVertexMap;
 		std::vector<assetTypes::vertex> FinalVertices;
+		std::string PosString;
 		u32 CurrentIndex = 0;
-		for (u32 i = 0; i < (u32)VertexArray.size(); i++)
+		u32 VertexIndex = 0;
+		u32 VertArraySize = (u32)VertexArray.size();
+		u32 VertArrayHalf = (u32)(VertArraySize * 0.5f);
+		bool Ahead = false;
+		for (u32 i = 0; i < (u32)(VertArraySize); i++)
 		{
-			if (IndexVertexMap.count((char*)&VertexArray[i]) == 0)
+			if (VertexIndex != 0 && VertexIndex % 3 == 0)
 			{
-				IndexVertexMap[(char*)&VertexArray[i]] = CurrentIndex;
+				if (Ahead)
+					VertexIndex -= VertArrayHalf;
+				else
+					VertexIndex += VertArrayHalf - 3;
+				Ahead = !Ahead;
+			}
+
+			PosString = (std::to_string(VertexArray[VertexIndex].position.x) + std::to_string(VertexArray[VertexIndex].position.y) + std::to_string(VertexArray[VertexIndex].position.z));
+			if (IndexVertexMap.count(PosString) == 0)
+			{
+				IndexVertexMap[PosString] = CurrentIndex;
 				Indices.push_back(CurrentIndex++);
-				FinalVertices.push_back(VertexArray[i]);
+				FinalVertices.push_back(VertexArray[VertexIndex]);
 			}
 			else
-				Indices.push_back(IndexVertexMap[(char*)&VertexArray[i]]);
+				Indices.push_back(IndexVertexMap[PosString]);
+			VertexIndex++;
 		}
 
 		mesh_data MeshData;
